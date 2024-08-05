@@ -1,0 +1,27 @@
+server:
+  port: 9091
+
+spring:
+  application:
+    name: data-pump-service
+  jackson:
+    property-naming-strategy: SNAKE_CASE
+    default-property-inclusion: NON_NULL
+
+management:
+  security:
+    enabled: false
+
+  endpoints:
+    web:
+      base-path: /
+      path-mapping:
+        health: healthcheck
+      exposure:
+        include:
+          - info
+          - health
+          - httptrace
+          - env
+          - threaddump
+          - metrics
