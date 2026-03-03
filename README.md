@@ -50,17 +50,9 @@ Infrastructure: Toda a comunicação e configuração externa do nosso sistema. 
 - [Swagger] - Para documentacao dos servicos criados
 - [Intellij Community] - IDE Editor java
 - [GIT] - Para gestao dos fontes do projeto
-- [Java 11] - Versão do java para compilacao do sistema
+- [Java 25] - Versão do java para compilacao do sistema
 - [Maven] - para gestao de dependencias
-
-## Desenvolvimento local
-
-Url após subir a app : http://localhost:8080/swagger-ui/index.html
-
-### Rodando os testes
-```
-mvn clean install
-```
+- [Postgre] - Banco de dados para salvar payloads
 
 ### Rodando a aplicação no Docker Compose
 
@@ -76,14 +68,3 @@ ou
 
 $ mvn spring-boot:run 
 ```
-
-## Rodando a aplicação em modo de produção
-```
-$ java -jar target/<app-name>-1.0-SNAPSHOT.jar --spring.profiles.default=prod
-
-ou
-
-$ mvn spring-boot:run -Dspring-boot.run.profiles=prod
-```
-
-
