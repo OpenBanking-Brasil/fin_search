@@ -6,8 +6,5 @@
   "whisper_cpu_threads": 6,
   "whisper_num_workers": 1,
   "language": "pt",
-  "paste_delay": 0.12,
-  "translate_source": "auto",
-  "translate_target": "pt",
-  "translate_copy_delay": 0.18
+  "paste_delay": 0.12
 }
