@@ -18,6 +18,7 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class ReadBankDataService {
     private final ReadOpenDataEndpoints readOpenDataEndpoints;
+    private final CentralDirectoryIntegration centralDirectoryIntegration;
 
     public void readFamilyTypeApis(List<String> famiTypes) throws NoSuchAlgorithmException, KeyStoreException, KeyManagementException {
         famiTypes.forEach(familyType -> discoveryEndpoints(familyType));
@@ -33,14 +34,20 @@ public class ReadBankDataService {
 
     private List<InstituitionDTO> getEndpointsByServices(String service, String customer) {
         log.info("Read data from Central Directory");
-        CentralDirectoryIntegration centralDirectoryIntegration = new CentralDirectoryIntegration();
-        return centralDirectoryIntegration.findUrls().stream().filter(endpoint -> endpoint.url().contains(service) && endpoint.url().contains("opendata") && !endpoint.url().contains("product-service") && endpoint.url().contains(customer)).collect(Collectors.toList());
+        return centralDirectoryIntegration.findUrls().stream()
+                .filter(endpoint -> endpoint.url().contains(service)
+                        && endpoint.url().contains("opendata")
+                        && !endpoint.url().contains("product-service")
+                        && endpoint.url().contains(customer))
+                .collect(Collectors.toList());
     }
 
     private List<InstituitionDTO> getEndpointsByChannels(String service) {
         log.info("Read data from Central Directory");
-        CentralDirectoryIntegration centralDirectoryIntegration = new CentralDirectoryIntegration();
-        return centralDirectoryIntegration.findUrls().stream().filter(endpoint -> endpoint.url().contains(service) && !endpoint.url().contains("v1")).distinct().collect(Collectors.toList());
+        return centralDirectoryIntegration.findUrls().stream()
+                .filter(endpoint -> endpoint.url().contains(service) && !endpoint.url().contains("v1"))
+                .distinct()
+                .collect(Collectors.toList());
     }
 
     private void sendData(ReadOpenDataEndpoints readOpenDataEndpoints, String companyName, String endpoint, String customer, String familyType) {
