@@ -55,10 +55,11 @@ DEFAULT_CONFIG = {
     "whisper_compute_type": "int8",
     "whisper_cpu_threads": 6,
     "whisper_num_workers": 1,
-    "language": "pt",
+    "language": "auto",
     "paste_delay": 0.12,
-    "desktop_button": True,
+    "desktop_button": False,
     "dialogue_choice_timeout_sec": 7.0,
+    "dialogue_requires_confirmation": False,
 }
 
 
@@ -158,6 +159,13 @@ def compress_repeats(text: str) -> str:
     return " ".join(out).strip()
 
 
+def resolve_language_setting(raw_value: object) -> str | None:
+    v = str(raw_value or "").strip().lower()
+    if v in {"", "auto", "multilingual", "multi", "pt,en", "pt-br,en", "pt-pt,en"}:
+        return None
+    return v
+
+
 def is_hotkey_event(name: str, hotkey: str, scan_code: int | None = None) -> bool:
     n = (name or "").lower().strip()
     hk = (hotkey or "").lower().strip()
@@ -255,7 +263,7 @@ class PTTController:
         self.model = model
         self.cap = cap
         self.acfg = acfg
-        self.language = str(cfg.get("language", "pt"))
+        self.language = resolve_language_setting(cfg.get("language", "auto"))
         self.paste_delay = float(cfg.get("paste_delay", 0.12))
         self.event_cb = event_cb
         self._pressed = False
@@ -344,7 +352,7 @@ def paste_text(text: str, delay_sec: float) -> None:
                 pass
 
 
-def transcribe_whisper(model: WhisperModel, audio: np.ndarray, language: str) -> str:
+def transcribe_whisper(model: WhisperModel, audio: np.ndarray, language: str | None) -> str:
     segments, _info = model.transcribe(
         audio,
         language=language,
@@ -373,11 +381,12 @@ def run_dialogue_worker(
     decision_q: queue.Queue[str] | None = None,
 ) -> None:
     """Transcreve segmentos detetados automaticamente (incluem pré-escuta)."""
-    language = str(cfg.get("language", "pt"))
+    language = resolve_language_setting(cfg.get("language", "auto"))
     paste_delay = float(cfg.get("paste_delay", 0.12))
     dc = merge_dialogue_config(cfg)
     auto_paste = bool(dc.get("auto_paste", True))
     choice_timeout = float(cfg.get("dialogue_choice_timeout_sec", 7.0))
+    require_confirmation = bool(cfg.get("dialogue_requires_confirmation", False))
     last_text_norm = ""
     last_text_ts = 0.0
 
@@ -388,7 +397,7 @@ def run_dialogue_worker(
             continue
         if event_cb is not None:
             event_cb("voice_detected", "")
-        if decision_q is not None:
+        if require_confirmation and decision_q is not None:
             # Remove decisões antigas para não aplicar cliques atrasados num novo diálogo.
             while True:
                 try:
@@ -550,8 +559,16 @@ def run_desktop_button(
 
     root = tk.Tk()
     root.title("Transcricao de voz")
-    root.attributes("-topmost", True)
+    root.attributes("-topmost", False)
     root.resizable(False, False)
+    try:
+        root.attributes("-alpha", 0.94)
+    except Exception:
+        pass
+    try:
+        root.wm_attributes("-toolwindow", True)
+    except Exception:
+        pass
 
     status_var = tk.StringVar(value="Aguardando. Clique para iniciar.")
     button_var = tk.StringVar(value="Iniciar transcricao")
@@ -624,7 +641,10 @@ def run_desktop_button(
         command=choose_dialogue_ignore,
     )
     btn_dialogue_no.pack(fill="x")
-    set_decision_buttons(False)
+    if dialogue_decisions is None:
+        decision_frame.pack_forget()
+    else:
+        set_decision_buttons(False)
 
     def place_window() -> None:
         root.update_idletasks()
@@ -642,13 +662,14 @@ def run_desktop_button(
             y = max(top + 12, bottom - height - 20)
         root.geometry(f"{width}x{height}+{x}+{y}")
 
-    def pulse_window() -> None:
+    def pulse_window(strong: bool = False) -> None:
         try:
             place_window()
             root.deiconify()
-            root.focus_force()
-            root.attributes("-topmost", True)
             root.lift()
+            root.attributes("-topmost", True)
+            hold_ms = 1800 if strong else 700
+            root.after(hold_ms, lambda: root.attributes("-topmost", False))
         except Exception:
             pass
 
@@ -667,16 +688,16 @@ def run_desktop_button(
                 break
 
             if evt == "voice_detected":
-                status_var.set("Voz detectada. Pode iniciar gravacao manual.")
+                status_var.set("Voz detectada.")
                 pulse_window()
             elif evt == "dialogue_started":
-                status_var.set("Fala em curso detectada. Janela pronta para acao.")
+                status_var.set("Fala detectada.")
                 pulse_window()
             elif evt == "dialogue_waiting_choice":
                 status_var.set("Dialogo detectado. Escolha: transcrever ou ignorar.")
                 dialogue_pending["value"] = True
                 set_decision_buttons(True)
-                pulse_window()
+                pulse_window(strong=True)
             elif evt == "dialogue_transcribed":
                 status_var.set("Dialogo transcrito.")
                 dialogue_pending["value"] = False
@@ -699,8 +720,8 @@ def run_desktop_button(
         root.after(220, poll_ui_events)
 
     def on_close() -> None:
-        # Mantem o botao disponivel sem encerrar o processo.
-        root.iconify()
+        # Esconde a janela sem parar deteccao; volta ao detetar audio/dialogo.
+        root.withdraw()
 
     root.protocol("WM_DELETE_WINDOW", on_close)
     place_window()
@@ -752,7 +773,10 @@ def main() -> None:
     shutdown = threading.Event()
     cap = AudioCapture()
     ui_events: queue.Queue = queue.Queue(maxsize=64)
-    dialogue_decisions: queue.Queue[str] = queue.Queue(maxsize=4)
+    require_dialogue_confirmation = bool(cfg.get("dialogue_requires_confirmation", False))
+    dialogue_decisions: queue.Queue[str] | None = (
+        queue.Queue(maxsize=4) if require_dialogue_confirmation else None
+    )
 
     def emit_ui_event(kind: str, payload: str = "") -> None:
         try:
@@ -790,6 +814,8 @@ def main() -> None:
             "(Dialogo automatico: deteccao de fala + pre-escuta de "
             f"{dc.get('pre_roll_seconds', 1.0)}s antes do inicio; PTT continua ativo.)"
         )
+        if not require_dialogue_confirmation:
+            print("(Dialogo: transcricao continua automatica, sem confirmacao manual.)")
         print(
             "(Mesmo microfone: a voz captada ao usar dictacao/transcricao noutra app "
             "(Notion, browser, Word, etc.) entra neste fluxo se o Windows estiver em "
@@ -812,7 +838,8 @@ def main() -> None:
     hotkey = str(cfg.get("hotkey", "asterisk"))
     print(
         f"Microfone pronto. Segure '{hotkey}' para gravar e solte para transcrever/colar. "
-        f"Whisper={cfg.get('whisper_model')} ({cfg.get('whisper_device')}/{cfg.get('whisper_compute_type')})"
+        f"Whisper={cfg.get('whisper_model')} ({cfg.get('whisper_device')}/{cfg.get('whisper_compute_type')}) "
+        f"idioma={'auto' if resolve_language_setting(cfg.get('language', 'auto')) is None else cfg.get('language')}"
     )
     print("Tradutor de botao direito removido.")
 
