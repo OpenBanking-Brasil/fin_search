@@ -6,9 +6,9 @@ Arquitetura baseada em microsserviços para apoiar o uso das APIs Dados Abertos 
 
 O que é disponibilizado neste serviço:​
 
-* Pesquisa ao Diretório Central para extrair as URLs do OFB existentes em cada instituição financeira;​
-* Filtra as URLs existentes relativas a Dados Abertos;​
-* Extrai o payload de cada API para posterior analise e comparação de dados.
+- Pesquisa ao Diretório Central para extrair as URLs do OFB existentes em cada instituição financeira;​
+- Filtra as URLs existentes relativas a Dados Abertos;​
+- Extrai o payload de cada API para posterior analise e comparação de dados.
 
 ## O que posso fazer com esse microsserviço
 
@@ -46,6 +46,7 @@ Infrastructure: Toda a comunicação e configuração externa do nosso sistema. 
 **outbound** do nosso sistema, visando o desacoplamento da solução com os detalhes de infraestrutura.
 
 ## Tecnologias
+
 - [Spring Boot] - Para otimizacao do trabalho e foco na regra de negocio
 - [Swagger] - Para documentacao dos servicos criados
 - [Intellij Community] - IDE Editor java
@@ -61,6 +62,7 @@ docker compose up -d
 ```
 
 ### Rodando a aplicação
+
 ```
 $ java -jar target/<app-name>-1.0-SNAPSHOT.jar
 
@@ -68,3 +70,4 @@ ou
 
 $ mvn spring-boot:run 
 ```
+
