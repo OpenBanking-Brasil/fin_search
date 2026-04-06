@@ -8,6 +8,7 @@ import ctypes
 import threading
 import time
 from pathlib import Path
+from typing import Callable
 
 import keyboard
 import numpy as np
@@ -56,7 +57,45 @@ DEFAULT_CONFIG = {
     "whisper_num_workers": 1,
     "language": "pt",
     "paste_delay": 0.12,
+    "desktop_button": True,
+    "dialogue_choice_timeout_sec": 7.0,
 }
+
+
+class _POINT(ctypes.Structure):
+    _fields_ = [("x", ctypes.c_long), ("y", ctypes.c_long)]
+
+
+class _RECT(ctypes.Structure):
+    _fields_ = [("left", ctypes.c_long), ("top", ctypes.c_long), ("right", ctypes.c_long), ("bottom", ctypes.c_long)]
+
+
+class _MONITORINFO(ctypes.Structure):
+    _fields_ = [
+        ("cbSize", ctypes.c_ulong),
+        ("rcMonitor", _RECT),
+        ("rcWork", _RECT),
+        ("dwFlags", ctypes.c_ulong),
+    ]
+
+
+def get_cursor_monitor_workarea() -> tuple[int, int, int, int] | None:
+    if sys.platform != "win32":
+        return None
+    user32 = ctypes.windll.user32
+    pt = _POINT()
+    if not user32.GetCursorPos(ctypes.byref(pt)):
+        return None
+    # MONITOR_DEFAULTTONEAREST = 2
+    hmon = user32.MonitorFromPoint(pt, 2)
+    if not hmon:
+        return None
+    mi = _MONITORINFO()
+    mi.cbSize = ctypes.sizeof(_MONITORINFO)
+    if not user32.GetMonitorInfoW(hmon, ctypes.byref(mi)):
+        return None
+    rc = mi.rcWork
+    return int(rc.left), int(rc.top), int(rc.right), int(rc.bottom)
 
 
 def script_dir() -> Path:
@@ -137,6 +176,9 @@ class AudioCapture:
         self.dialogue_segmenter: DialogueSegmenter | None = None
         self.dialogue_queue: queue.Queue | None = None
         self.dialogue_enabled: bool = False
+        self.ui_event_cb: Callable[[str, str], None] | None = None
+        self._last_dialogue_state: str = "idle"
+        self._last_voice_event_ts: float = 0.0
 
     def callback(self, indata, frames, time_info, status):
         mono = indata[:, 0].astype(np.float32).copy()
@@ -149,6 +191,15 @@ class AudioCapture:
         ):
             try:
                 seg = self.dialogue_segmenter.push(mono, ptt_active=self.recording)
+                state_now = self.dialogue_segmenter.state
+                if state_now == "recording" and self._last_dialogue_state != "recording":
+                    now = time.monotonic()
+                    if (now - self._last_voice_event_ts) > 0.45:
+                        if self.ui_event_cb is not None:
+                            self.ui_event_cb("voice_detected", "")
+                            self.ui_event_cb("dialogue_started", "")
+                        self._last_voice_event_ts = now
+                self._last_dialogue_state = state_now
                 if seg is not None:
                     self.dialogue_queue.put_nowait(seg)
             except queue.Full:
@@ -183,12 +234,85 @@ class AudioCapture:
         self.recording = True
         if self.dialogue_segmenter is not None:
             self.dialogue_segmenter.reset()
+            self._last_dialogue_state = "idle"
 
     def end(self) -> np.ndarray | None:
         self.recording = False
         if not self.blocks:
             return None
         return np.concatenate(self.blocks, axis=0)
+
+
+class PTTController:
+    def __init__(
+        self,
+        model: WhisperModel,
+        cap: AudioCapture,
+        cfg: dict,
+        acfg: ArchiveConfig,
+        event_cb: Callable[[str, str], None] | None = None,
+    ) -> None:
+        self.model = model
+        self.cap = cap
+        self.acfg = acfg
+        self.language = str(cfg.get("language", "pt"))
+        self.paste_delay = float(cfg.get("paste_delay", 0.12))
+        self.event_cb = event_cb
+        self._pressed = False
+        self._lock = threading.Lock()
+        self._last_text_norm = ""
+        self._last_text_ts = 0.0
+
+    def is_pressed(self) -> bool:
+        with self._lock:
+            return self._pressed
+
+    def press(self) -> None:
+        with self._lock:
+            if self._pressed:
+                return
+            self._pressed = True
+            self.cap.begin()
+        if self.event_cb is not None:
+            self.event_cb("ptt_started", "")
+
+    def release(self) -> None:
+        with self._lock:
+            if not self._pressed:
+                return
+            self._pressed = False
+            audio = self.cap.end()
+        if self.event_cb is not None:
+            self.event_cb("ptt_stopped", "")
+
+        if audio is None or audio.size == 0:
+            return
+
+        save_ptt_audio_opus(self.acfg, audio, SAMPLE_RATE)
+        try:
+            text = transcribe_whisper(self.model, audio, self.language)
+        except Exception as ex:
+            print(f"(PTT erro de transcricao: {ex})")
+            return
+
+        text = compress_repeats(text)
+        if not text:
+            return
+
+        now = time.monotonic()
+        norm = normalize_text(text)
+        with self._lock:
+            if norm and norm == self._last_text_norm and (now - self._last_text_ts) < DEDUP_WINDOW_SEC:
+                print("(Duplicado ignorado)")
+                return
+            self._last_text_norm = norm
+            self._last_text_ts = now
+
+        save_transcript_block(self.acfg, text, "transcricao")
+        paste_text(text, self.paste_delay)
+        print(f" -> {text}")
+        if self.event_cb is not None:
+            self.event_cb("ptt_transcribed", text)
 
 
 def create_tray_image() -> Image.Image:
@@ -245,12 +369,15 @@ def run_dialogue_worker(
     shutdown: threading.Event,
     acfg: ArchiveConfig,
     audio_q: queue.Queue,
+    event_cb: Callable[[str, str], None] | None = None,
+    decision_q: queue.Queue[str] | None = None,
 ) -> None:
     """Transcreve segmentos detetados automaticamente (incluem pré-escuta)."""
     language = str(cfg.get("language", "pt"))
     paste_delay = float(cfg.get("paste_delay", 0.12))
     dc = merge_dialogue_config(cfg)
     auto_paste = bool(dc.get("auto_paste", True))
+    choice_timeout = float(cfg.get("dialogue_choice_timeout_sec", 7.0))
     last_text_norm = ""
     last_text_ts = 0.0
 
@@ -259,6 +386,33 @@ def run_dialogue_worker(
             audio = audio_q.get(timeout=0.45)
         except queue.Empty:
             continue
+        if event_cb is not None:
+            event_cb("voice_detected", "")
+        if decision_q is not None:
+            # Remove decisões antigas para não aplicar cliques atrasados num novo diálogo.
+            while True:
+                try:
+                    decision_q.get_nowait()
+                except queue.Empty:
+                    break
+            if event_cb is not None:
+                event_cb("dialogue_waiting_choice", "")
+            decision = "transcribe"
+            deadline = time.monotonic() + max(1.0, choice_timeout)
+            while not shutdown.is_set():
+                rem = deadline - time.monotonic()
+                if rem <= 0:
+                    break
+                try:
+                    decision = decision_q.get(timeout=min(0.25, rem))
+                    break
+                except queue.Empty:
+                    continue
+            if decision == "ignore":
+                print("(Dialogo ignorado pelo botao.)")
+                if event_cb is not None:
+                    event_cb("dialogue_ignored", "")
+                continue
         save_ptt_audio_opus(acfg, audio, SAMPLE_RATE, stem_prefix="dialogo")
         try:
             text = transcribe_whisper(model, audio, language)
@@ -279,60 +433,26 @@ def run_dialogue_worker(
         if auto_paste:
             paste_text(text, paste_delay)
         print(f"(Dialogo) -> {text}")
+        if event_cb is not None:
+            event_cb("dialogue_transcribed", text)
 
 
 def run_ptt_worker(
-    model: WhisperModel,
-    cap: AudioCapture,
+    controller: PTTController,
     cfg: dict,
     shutdown: threading.Event,
-    acfg: ArchiveConfig,
 ) -> None:
     hotkey = str(cfg.get("hotkey", "asterisk"))
-    language = str(cfg.get("language", "pt"))
-    paste_delay = float(cfg.get("paste_delay", 0.12))
-
-    state = {"pressed": False}
-    last_text_norm = ""
-    last_text_ts = 0.0
     last_evt = {"key": "", "etype": "", "ts": 0.0}
     hook_handles: list = []
     fallback_hook_used = False
     poll_thread: threading.Thread | None = None
 
     def start_recording_if_needed() -> None:
-        if state["pressed"]:
-            return
-        state["pressed"] = True
-        cap.begin()
+        controller.press()
 
     def stop_recording_and_process() -> None:
-        nonlocal last_text_norm, last_text_ts
-        if not state["pressed"]:
-            return
-        state["pressed"] = False
-        audio = cap.end()
-        if audio is None or audio.size == 0:
-            return
-        save_ptt_audio_opus(acfg, audio, SAMPLE_RATE)
-        try:
-            text = transcribe_whisper(model, audio, language)
-        except Exception as ex:
-            print(f"(PTT erro de transcricao: {ex})")
-            return
-        text = compress_repeats(text)
-        if not text:
-            return
-        now = time.monotonic()
-        norm = normalize_text(text)
-        if norm and norm == last_text_norm and (now - last_text_ts) < DEDUP_WINDOW_SEC:
-            print("(Duplicado ignorado)")
-            return
-        last_text_norm = norm
-        last_text_ts = now
-        save_transcript_block(acfg, text, "transcricao")
-        paste_text(text, paste_delay)
-        print(f" -> {text}")
+        controller.release()
 
     def on_event(e):
         if shutdown.is_set():
@@ -416,6 +536,180 @@ def run_ptt_worker(
             poll_thread.join(timeout=1.0)
 
 
+def run_desktop_button(
+    shutdown: threading.Event,
+    controller: PTTController,
+    ui_events: queue.Queue,
+    dialogue_decisions: queue.Queue[str] | None = None,
+) -> None:
+    try:
+        import tkinter as tk
+    except Exception as ex:
+        print(f"(Botao desktop indisponivel: {ex})")
+        return
+
+    root = tk.Tk()
+    root.title("Transcricao de voz")
+    root.attributes("-topmost", True)
+    root.resizable(False, False)
+
+    status_var = tk.StringVar(value="Aguardando. Clique para iniciar.")
+    button_var = tk.StringVar(value="Iniciar transcricao")
+    dialogue_pending = {"value": False}
+
+    frame = tk.Frame(root, padx=10, pady=10)
+    frame.pack(fill="both", expand=True)
+
+    label = tk.Label(frame, textvariable=status_var, width=42, anchor="w")
+    label.pack(fill="x", pady=(0, 8))
+
+    def refresh_button() -> None:
+        if controller.is_pressed():
+            button_var.set("Parar transcricao")
+            status_var.set("Gravando... clique para parar.")
+        else:
+            button_var.set("Iniciar transcricao")
+
+    def toggle_recording() -> None:
+        if controller.is_pressed():
+            controller.release()
+        else:
+            controller.press()
+        refresh_button()
+
+    button = tk.Button(frame, textvariable=button_var, width=28, command=toggle_recording)
+    button.pack(fill="x")
+
+    decision_frame = tk.Frame(frame, pady=6)
+    decision_frame.pack(fill="x")
+
+    def set_decision_buttons(enabled: bool) -> None:
+        state = "normal" if enabled else "disabled"
+        btn_dialogue_yes.configure(state=state)
+        btn_dialogue_no.configure(state=state)
+
+    def choose_dialogue_transcribe() -> None:
+        if dialogue_decisions is None or not dialogue_pending["value"]:
+            return
+        try:
+            dialogue_decisions.put_nowait("transcribe")
+            dialogue_pending["value"] = False
+            set_decision_buttons(False)
+            status_var.set("Dialogo confirmado para transcricao.")
+        except queue.Full:
+            pass
+
+    def choose_dialogue_ignore() -> None:
+        if dialogue_decisions is None or not dialogue_pending["value"]:
+            return
+        try:
+            dialogue_decisions.put_nowait("ignore")
+            dialogue_pending["value"] = False
+            set_decision_buttons(False)
+            status_var.set("Dialogo ignorado.")
+        except queue.Full:
+            pass
+
+    btn_dialogue_yes = tk.Button(
+        decision_frame,
+        text="Transcrever dialogo detectado",
+        width=28,
+        command=choose_dialogue_transcribe,
+    )
+    btn_dialogue_yes.pack(fill="x", pady=(2, 4))
+    btn_dialogue_no = tk.Button(
+        decision_frame,
+        text="Ignorar dialogo detectado",
+        width=28,
+        command=choose_dialogue_ignore,
+    )
+    btn_dialogue_no.pack(fill="x")
+    set_decision_buttons(False)
+
+    def place_window() -> None:
+        root.update_idletasks()
+        width = max(root.winfo_width(), 360)
+        height = max(root.winfo_height(), 96)
+        work_area = get_cursor_monitor_workarea()
+        if work_area is None:
+            screen_w = root.winfo_screenwidth()
+            screen_h = root.winfo_screenheight()
+            x = max(20, screen_w - width - 36)
+            y = max(20, screen_h - height - 78)
+        else:
+            left, top, right, bottom = work_area
+            x = max(left + 12, right - width - 20)
+            y = max(top + 12, bottom - height - 20)
+        root.geometry(f"{width}x{height}+{x}+{y}")
+
+    def pulse_window() -> None:
+        try:
+            place_window()
+            root.deiconify()
+            root.focus_force()
+            root.attributes("-topmost", True)
+            root.lift()
+        except Exception:
+            pass
+
+    def poll_ui_events() -> None:
+        if shutdown.is_set():
+            try:
+                root.destroy()
+            except Exception:
+                pass
+            return
+
+        while True:
+            try:
+                evt, _payload = ui_events.get_nowait()
+            except queue.Empty:
+                break
+
+            if evt == "voice_detected":
+                status_var.set("Voz detectada. Pode iniciar gravacao manual.")
+                pulse_window()
+            elif evt == "dialogue_started":
+                status_var.set("Fala em curso detectada. Janela pronta para acao.")
+                pulse_window()
+            elif evt == "dialogue_waiting_choice":
+                status_var.set("Dialogo detectado. Escolha: transcrever ou ignorar.")
+                dialogue_pending["value"] = True
+                set_decision_buttons(True)
+                pulse_window()
+            elif evt == "dialogue_transcribed":
+                status_var.set("Dialogo transcrito.")
+                dialogue_pending["value"] = False
+                set_decision_buttons(False)
+                pulse_window()
+            elif evt == "dialogue_ignored":
+                status_var.set("Dialogo ignorado.")
+                dialogue_pending["value"] = False
+                set_decision_buttons(False)
+                pulse_window()
+            elif evt == "ptt_transcribed":
+                status_var.set("Transcricao concluida.")
+                pulse_window()
+            elif evt == "ptt_started":
+                status_var.set("Gravando... clique para parar.")
+            elif evt == "ptt_stopped":
+                status_var.set("Gravacao parada.")
+
+        refresh_button()
+        root.after(220, poll_ui_events)
+
+    def on_close() -> None:
+        # Mantem o botao disponivel sem encerrar o processo.
+        root.iconify()
+
+    root.protocol("WM_DELETE_WINDOW", on_close)
+    place_window()
+    refresh_button()
+    root.after(220, poll_ui_events)
+    root.mainloop()
+    shutdown.set()
+
+
 def run_tray(shutdown: threading.Event) -> None:
     image = create_tray_image()
 
@@ -457,6 +751,16 @@ def main() -> None:
 
     shutdown = threading.Event()
     cap = AudioCapture()
+    ui_events: queue.Queue = queue.Queue(maxsize=64)
+    dialogue_decisions: queue.Queue[str] = queue.Queue(maxsize=4)
+
+    def emit_ui_event(kind: str, payload: str = "") -> None:
+        try:
+            ui_events.put_nowait((kind, payload))
+        except queue.Full:
+            pass
+    cap.ui_event_cb = emit_ui_event
+
     dc = merge_dialogue_config(cfg)
     dialogue_thread: threading.Thread | None = None
     if dc.get("enabled"):
@@ -468,7 +772,15 @@ def main() -> None:
             try:
                 q = cap.dialogue_queue
                 if q is not None:
-                    run_dialogue_worker(model, cfg, shutdown, acfg, q)
+                    run_dialogue_worker(
+                        model,
+                        cfg,
+                        shutdown,
+                        acfg,
+                        q,
+                        event_cb=emit_ui_event,
+                        decision_q=dialogue_decisions,
+                    )
             except Exception as ex:
                 print(f"(Dialogo worker: {ex})")
 
@@ -505,14 +817,16 @@ def main() -> None:
     print("Tradutor de botao direito removido.")
 
     ptt_thread: threading.Thread | None = None
+    desktop_button_thread: threading.Thread | None = None
     kbd_arch: KeyboardArchiver | None = None
+    ptt_controller = PTTController(model, cap, cfg, acfg, event_cb=emit_ui_event)
 
     def start_ptt_thread() -> None:
         nonlocal ptt_thread
 
         def ptt_entry() -> None:
             try:
-                run_ptt_worker(model, cap, cfg, shutdown, acfg)
+                run_ptt_worker(ptt_controller, cfg, shutdown)
             except Exception as ex:
                 print(f"(Worker PTT falhou: {ex})")
 
@@ -526,6 +840,16 @@ def main() -> None:
         print(f"(Arquivo: teclado nao iniciado: {ex})")
 
     start_ptt_thread()
+    if bool(cfg.get("desktop_button", True)):
+        desktop_button_thread = threading.Thread(
+            target=run_desktop_button,
+            args=(shutdown, ptt_controller, ui_events, dialogue_decisions),
+            name="desktop-button",
+            daemon=True,
+        )
+        desktop_button_thread.start()
+        print("(Botao desktop ativo: usar para iniciar/parar transcricao.)")
+
     tray_thread = threading.Thread(target=run_tray, args=(shutdown,), name="tray", daemon=True)
     tray_thread.start()
 
@@ -547,6 +871,8 @@ def main() -> None:
             ptt_thread.join(timeout=15.0)
         if dialogue_thread is not None and dialogue_thread.is_alive():
             dialogue_thread.join(timeout=20.0)
+        if desktop_button_thread is not None and desktop_button_thread.is_alive():
+            desktop_button_thread.join(timeout=2.0)
         if tray_thread.is_alive():
             tray_thread.join(timeout=2.0)
         try:
