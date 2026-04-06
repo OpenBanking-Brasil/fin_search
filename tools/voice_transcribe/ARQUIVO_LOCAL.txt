@@ -3,6 +3,11 @@ Arquivo local (Área de trabalho\LocalVoiceArchive por defeito)
 A pasta fica no Ambiente de trabalho / Desktop (ou OneDrive\Desktop
 se for o caso). Para outro sítio, use archive.root em voice_config.json.
 
+ARRANQUE COM O WINDOWS (sempre ativo como o asterisco)
+------------------------------------------------------
+Execute uma vez: instalar_arranque_automatico.bat
+Detalhes: ARRANQUE.txt
+
 ORGANIZACAO POR DATA E HORA
 ---------------------------
 Audio (voz, cada gravacao PTT):

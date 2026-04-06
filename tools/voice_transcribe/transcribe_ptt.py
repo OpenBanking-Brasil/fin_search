@@ -4,6 +4,7 @@ import json
 import queue
 import re
 import sys
+import ctypes
 import threading
 import time
 from pathlib import Path
@@ -38,6 +39,8 @@ def _configure_stdio_utf8() -> None:
 
 _configure_stdio_utf8()
 
+_SINGLE_INSTANCE_MUTEX = None
+
 SAMPLE_RATE = 16000
 BLOCK_SIZE = 1024
 DEDUP_WINDOW_SEC = 8.0
@@ -58,6 +61,26 @@ DEFAULT_CONFIG = {
 
 def script_dir() -> Path:
     return Path(__file__).resolve().parent
+
+
+def _windows_single_instance_begin() -> bool:
+    """
+    Garante uma única instância no Windows (arranque automático + atalho não duplicam o processo).
+    """
+    global _SINGLE_INSTANCE_MUTEX
+    if sys.platform != "win32":
+        return True
+    ERROR_ALREADY_EXISTS = 183
+    kernel32 = ctypes.windll.kernel32
+    name = "Local\\FinSearch_TranscricaoPTT"
+    h = kernel32.CreateMutexW(None, False, name)
+    if not h:
+        return True
+    if kernel32.GetLastError() == ERROR_ALREADY_EXISTS:
+        kernel32.CloseHandle(h)
+        return False
+    _SINGLE_INSTANCE_MUTEX = h
+    return True
 
 
 def load_config() -> dict:
@@ -412,6 +435,9 @@ def run_tray(shutdown: threading.Event) -> None:
 
 
 def main() -> None:
+    if not _windows_single_instance_begin():
+        sys.exit(0)
+
     cfg = load_config()
 
     model = WhisperModel(
