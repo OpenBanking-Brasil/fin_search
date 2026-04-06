@@ -47,10 +47,19 @@ def merge_archive_config(cfg: dict) -> dict:
     return out
 
 
+def _default_archive_root() -> Path:
+    """Pasta predefinida: Desktop/LocalVoiceArchive (ou OneDrive Desktop se existir)."""
+    home = Path.home()
+    for desktop in (home / "Desktop", home / "OneDrive" / "Desktop"):
+        if desktop.is_dir():
+            return (desktop / "LocalVoiceArchive").resolve()
+    return (home / "Documents" / "LocalVoiceArchive").resolve()
+
+
 def _resolve_root(root: str) -> Path:
     if (root or "").strip():
         return Path(root).expanduser().resolve()
-    return (Path.home() / "Documents" / "LocalVoiceArchive").resolve()
+    return _default_archive_root()
 
 
 class ArchiveConfig:
