@@ -1,0 +1,6 @@
+{
+  "root": "",
+  "poll_interval_ms": 400,
+  "max_text_chars": 500000,
+  "skip_duplicate_text": true
+}

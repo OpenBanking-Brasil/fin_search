@@ -52,5 +52,13 @@ tools/voice_transcribe/voice_config.json
 *.p12
 *.jks
 
+# Python
+__pycache__/
+*.py[cod]
+
+# Clipboard archive local
+tools/clipboard_archive/data/
+tools/clipboard_archive/clipboard_config.json
+
 # Outros
 *.bak
