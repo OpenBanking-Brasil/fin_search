@@ -2,24 +2,21 @@
 
 Plataforma que combina leitura de dados abertos do **Open Finance Brasil** com o **ARCÁDIA OS** - Sistema Operacional de Decisão Autônoma que oferece máximo ganho financeiro com carga mental mínima através de um Parlamento Cognitivo inteligente.
 
+**Propriedade:** este repositório (**fin_search**) é o projeto principal; o **ARCÁDIA OS** (UI, Parlamento, Orquestrador, Supabase, rotas `/api` com Gemini) vive em `tools/Fabric/web`. O código histórico mantém a pasta `Fabric` no caminho; **não** é necessário o binário Fabric nem a porta 18080.
+
 ---
 
 ## Arquitetura
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│  🏛️ ARCÁDIA OS (SvelteKit + Tailwind)  —  porta 5173        │
-│  Parliament + Orchestrator + Dashboard + Constituição      │
+│  🏛️ ARCÁDIA OS (SvelteKit)  —  Vite (ex.: 5199)             │
+│  Parliament + Orchestrator + /api/chat (Gemini no servidor)  │
 └────────────────────┬────────────────────────────────────────┘
-                     │ HTTP + WebSocket
+                     │ HTTPS API
 ┌────────────────────▼────────────────────────────────────────┐
 │  📊 Supabase (PostgreSQL + Auth + API)                      │
 │  RLS + Triggers + Functions + Real-time                     │
-└─────────────────────────────────────────────────────────────┘
-
-┌─────────────────────────────────────────────────────────────┐
-│  🤖 Fabric Go (backend de IA)  —  porta 18080               │
-│  Patterns + Strategies + Streaming + Auto-routing           │
 └─────────────────────────────────────────────────────────────┘
 
 ┌─────────────────────────────────────────────────────────────┐
@@ -43,7 +40,7 @@ Plataforma que combina leitura de dados abertos do **Open Finance Brasil** com o
 | Segurança | Spring Security (HTTP Basic), AES-GCM (dados) |
 | Documentação | springdoc-openapi (Swagger UI em `/swagger-ui.html`) |
 | Frontend | SvelteKit 2, Svelte 5, Tailwind CSS, Skeleton UI |
-| IA | ARCÁDIA OS + Fabric (Go) + Gemini 2.5 Flash |
+| IA | ARCÁDIA OS (rotas SvelteKit) + Google Gemini |
 | Database | Supabase (PostgreSQL + Auth + Real-time) |
 | Infra | Docker, Docker Compose, GitHub Actions CI |
 
@@ -54,9 +51,8 @@ Plataforma que combina leitura de dados abertos do **Open Finance Brasil** com o
 - Java 21+
 - Maven (ou use `./mvnw`)
 - Docker + Docker Compose
-- [Fabric](https://github.com/danielmiessler/Fabric) instalado (winget install Fabric)
-- Node.js 20+ (para o frontend)
-- Chave de API Gemini (obter em https://aistudio.google.com)
+- Node.js 20+ (para o frontend ARCÁDIA)
+- Chave de API Gemini no `.env` do web (`ARCADIA_GEMINI_API_KEY`; ver `tools/Fabric/web/env.example`)
 - Conta Supabase (para o ARCÁDIA OS)
 
 ---
@@ -71,14 +67,7 @@ docker compose up -d postgres pgadmin
 
 pgAdmin disponível em http://localhost:8080 (admin@exemplo.com / admin123)
 
-### 2. Configurar chave Gemini
-
-```powershell
-# Windows (PowerShell)
-.\tools\fabric_gemini_setup.ps1
-```
-
-### 3. Subir backend Spring Boot
+### 2. Subir backend Spring Boot
 
 ```bash
 ./mvnw spring-boot:run
@@ -88,18 +77,20 @@ API disponível em http://localhost:8081
 Swagger UI: http://localhost:8081/swagger-ui.html  
 Health check: http://localhost:8081/healthcheck
 
-### 4. Configurar e iniciar ARCÁDIA OS
+### 3. Configurar e iniciar ARCÁDIA OS
 
 ```powershell
-# Setup completo automatizado (Supabase + Fabric + Frontend)
+# Setup (Supabase + npm; copiar env.example → .env e ARCADIA_GEMINI_API_KEY)
 .\tools\setup_arcadia_os.ps1 -SupabaseUrl "https://xxx.supabase.co" -SupabaseKey "your-key"
 
-# Ou inicie manualmente:
-.\tools\start_fabric_local_app.ps1  # Backend Fabric (18080)
-cd tools\Fabric\web && npm run dev  # Frontend ARCÁDIA OS (5173)
+# Ou inicie o Vite (API em /api no mesmo processo):
+.\tools\start_fabric_local_app.ps1
+# cd tools\Fabric\web && npm run dev
 ```
 
-**ARCÁDIA OS** disponível em http://localhost:5173
+**ARCÁDIA OS** — URL mostrada pelo Vite (por defeito `http://127.0.0.1:5199`).
+
+Aplique as migrações SQL em `supabase/migrations/` no projeto Supabase (inclui **Planeamento** + fluxo de caixa + KPIs). Depois do login: **`/planning`** (objetivos, revisões, importação CSV) e **`POST /api/finance/ingest`** (opcional, com service role no servidor).
 
 ---
 
@@ -289,7 +280,7 @@ Consulte `tools/Fabric/web/ARCADIA_README.md` para documentação detalhada incl
 
 ## Frontend IA — Funcionalidades
 
-- **AI Autopilot:** seleciona automaticamente o pattern e estratégia com base no texto (heurísticas + `suggest_pattern` via backend)
+- **AI Autopilot:** seleciona pattern e estratégia (heurísticas + `suggest_pattern` via API)
 - **Workflows:** atalhos pré-configurados (Resumir, Extrair Insights, Explicar Código, Revisar Código, Comparar, Melhorar Texto, Criar Plano)
 - **ResponseRefiner:** refina respostas de baixa confiança com `improve_writing`
 - **Métricas de sessão:** painel com taxa de sucesso, fallback, tempo médio e confiança do autopilot
@@ -299,28 +290,16 @@ Consulte `tools/Fabric/web/ARCADIA_README.md` para documentação detalhada incl
 ## 🛠️ Scripts de Automação
 
 ### ARCÁDIA OS
-- `setup_arcadia_os.ps1`: Setup completo automatizado (Supabase + Fabric + Frontend)
-- `start_fabric_local_app.ps1`: Launcher com auto-healing para backend + frontend
-- `fabric_aliases.ps1`: Cria aliases PowerShell para todos os patterns Fabric
-- `fabric_update.ps1`: Atualiza patterns, strategies e binário Fabric
+- `setup_arcadia_os.ps1`: npm install + `.env` (Supabase; lembrete `ARCADIA_GEMINI_API_KEY`)
+- `start_fabric_local_app.ps1`: inicia só o Vite/SvelteKit (API `/api` no mesmo processo)
 
-### Fabric Tradicional  
-- `fabric_gemini_setup.ps1`: Configuração interativa da API Gemini
-- Atalho Desktop: **"Fabric Local App"** (criado automaticamente)
+### Opcional (CLI Fabric a montante, não necessário para o ARCÁDIA OS)
+- `fabric_aliases.ps1`, `fabric_update.ps1`, `fabric_gemini_setup.ps1`: úteis se usar o projeto Fabric em separado
 
-### Uso Rápido
+### Uso rápido
 ```powershell
-# Setup completo do ARCÁDIA OS
 .\tools\setup_arcadia_os.ps1 -SupabaseUrl "https://xxx.supabase.co" -SupabaseKey "your-key"
-
-# Iniciar serviços
 .\tools\start_fabric_local_app.ps1
-
-# Atualizar Fabric
-.\tools\fabric_update.ps1
-
-# Criar aliases PowerShell
-.\tools\fabric_aliases.ps1
 ```
 
 ---

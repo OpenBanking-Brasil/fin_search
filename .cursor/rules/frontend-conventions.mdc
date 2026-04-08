@@ -1,17 +1,17 @@
 ---
-description: Convenções SvelteKit/TypeScript para o frontend Fabric (tools/Fabric/web)
+description: Convenções SvelteKit/TypeScript para o ARCÁDIA OS (tools/Fabric/web)
 globs: ["tools/Fabric/web/src/**/*.{svelte,ts,js}"]
 ---
 
-# Convenções Frontend — Fabric Web
+# Convenções Frontend — ARCÁDIA OS
 
 ## Stack
 - SvelteKit 2 + Svelte 5 + TypeScript + Tailwind CSS + Skeleton UI
 - Vite como bundler; rodar em `http://127.0.0.1:5199`
-- Backend Fabric Go em `http://127.0.0.1:18080`
+- API de IA nas rotas `/api/*` do Kit (ex.: `POST /api/chat` com Gemini no servidor); não há backend Fabric separado
 
 ## Serviços e Stores
-- `ChatService` → única forma de enviar mensagens ao backend
+- `ChatService` → envia mensagens a `POST /api/chat`
 - `IntentRouterService.route()` → para selecionar pattern/strategy automaticamente
 - `ResponseRefinerService.refine()` → refinar resposta se confiança < 0.85
 - `recordEvent()` de `autopilot-metrics-store` → registrar cada execução do autopilot
@@ -25,8 +25,7 @@ globs: ["tools/Fabric/web/src/**/*.{svelte,ts,js}"]
 - Erros: exibir no `messageStore` com `format: 'plain'` e role `'system'`
 
 ## Portas locais
-- Backend: 18080
-- Frontend: 5199
+- Frontend + API SvelteKit: 5199 (ou a porta indicada pelo Vite)
 
 ## Workflows predefinidos
 - Definidos em `$lib/config/workflows.ts`

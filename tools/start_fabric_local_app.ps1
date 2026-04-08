@@ -1,45 +1,34 @@
 <#
 .SYNOPSIS
-    Inicia o backend Fabric e o frontend SvelteKit localmente,
-    com auto-healing (reinicia automaticamente se os processos caírem).
-
-.PARAMETER ApiKey
-    Chave de API para proteger as rotas do servidor Fabric.
-    Se não informado, usa a variável de ambiente FABRIC_API_KEY.
-
-.PARAMETER BackendPort
-    Porta do backend Fabric (padrão: 18080)
+    Inicia o frontend ARCÁDIA OS (SvelteKit) localmente.
+    A API de chat e padrões ficam nas rotas /api/* do próprio servidor de desenvolvimento (Gemini no servidor).
 
 .PARAMETER FrontendPort
-    Porta do frontend SvelteKit (padrão: 5199)
+    Porta do Vite/SvelteKit (padrão: 5199)
 
 .PARAMETER NoOpen
     Não abrir o navegador automaticamente.
 
 .PARAMETER Watch
-    Mantém o script rodando e reinicia processos caídos a cada 15s (auto-healing).
+    Mantém o script a verificar se o processo na porta do frontend caiu e regista aviso (não reinicia automaticamente o Vite).
 
 .EXAMPLE
     .\start_fabric_local_app.ps1
-    .\start_fabric_local_app.ps1 -ApiKey "minha-chave-secreta"
-    .\start_fabric_local_app.ps1 -Watch
+    .\start_fabric_local_app.ps1 -FrontendPort 5173
 #>
 
 param(
-    [string] $ApiKey      = $env:FABRIC_API_KEY,
-    [int]    $BackendPort = 18080,
-    [int]    $FrontendPort= 5199,
+    [int]    $FrontendPort = 5199,
     [switch] $NoOpen,
     [switch] $Watch
 )
 
 $ErrorActionPreference = "Stop"
 
-$repoRoot = "D:\Users\caioc\Documents\GitHub\fin_search"
+$repoRoot = Split-Path -Parent $PSScriptRoot
 $webDir   = Join-Path $repoRoot "tools\Fabric\web"
-$appUrl   = "http://127.0.0.1:$FrontendPort/chat"
+$appUrl   = "http://127.0.0.1:$FrontendPort/login"
 
-# ── Helpers ───────────────────────────────────────────────────────────────────
 function Test-PortOpen {
     param([string]$HostName, [int]$Port)
     try {
@@ -56,22 +45,7 @@ function Write-Status {
     Write-Host "[$ts] $Msg" -ForegroundColor $Color
 }
 
-function Start-FabricBackend {
-    $serveCmd = "`"`" | fabric --serve --address :$BackendPort"
-    if ($ApiKey) {
-        $serveCmd = "`"`" | fabric --serve --address :$BackendPort --api-key `"$ApiKey`""
-    }
-
-    Start-Process powershell -ArgumentList @(
-        "-NoExit",
-        "-ExecutionPolicy", "Bypass",
-        "-Command", $serveCmd
-    ) -WorkingDirectory $repoRoot | Out-Null
-
-    Write-Status "Backend Fabric iniciado na porta $BackendPort." "Green"
-}
-
-function Start-FabricFrontend {
+function Start-ArcadiaFrontend {
     $frontendCmd = @"
 Set-Location "$webDir"
 `$null = New-Item -ItemType Directory -Force "static/data"
@@ -79,7 +53,6 @@ Set-Location "$webDir"
 if (Test-Path `$patternDesc) {
     Copy-Item `$patternDesc "static/data\pattern_descriptions.json" -Force
 }
-`$env:FABRIC_BASE_URL = "http://127.0.0.1:$BackendPort"
 npx vite dev --host 127.0.0.1 --port $FrontendPort
 "@
 
@@ -89,7 +62,7 @@ npx vite dev --host 127.0.0.1 --port $FrontendPort
         "-Command", $frontendCmd
     ) -WorkingDirectory $repoRoot | Out-Null
 
-    Write-Status "Frontend SvelteKit iniciado na porta $FrontendPort." "Green"
+    Write-Status "Frontend ARCÁDIA OS (Vite) iniciado na porta $FrontendPort." "Green"
 }
 
 function Open-AppWindow {
@@ -104,7 +77,7 @@ function Open-AppWindow {
 }
 
 function Wait-ForPort {
-    param([int]$Port, [int]$MaxSeconds = 30)
+    param([int]$Port, [int]$MaxSeconds = 40)
     $elapsed = 0
     while ($elapsed -lt $MaxSeconds) {
         if (Test-PortOpen -HostName "127.0.0.1" -Port $Port) { return $true }
@@ -114,67 +87,40 @@ function Wait-ForPort {
     return $false
 }
 
-# ── Inicialização ─────────────────────────────────────────────────────────────
-Write-Status "Iniciando Fabric Local App..." "White"
-if ($ApiKey) {
-    Write-Status "Modo seguro: API key configurada." "Yellow"
+Write-Status "Iniciando ARCÁDIA OS (apenas frontend; API em /api no Vite)..." "White"
+
+if (-not (Test-Path $webDir)) {
+    Write-Status "Pasta não encontrada: $webDir" "Red"
+    exit 1
 }
 
-# Backend
-if (-not (Test-PortOpen -HostName "127.0.0.1" -Port $BackendPort)) {
-    Start-FabricBackend
-    Write-Status "Aguardando backend ficar disponível..." "DarkGray"
-    $ok = Wait-ForPort -Port $BackendPort -MaxSeconds 20
-    if (-not $ok) {
-        Write-Status "AVISO: Backend não respondeu em 20s. Verifique erros acima." "Yellow"
-    }
-} else {
-    Write-Status "Backend já está rodando na porta $BackendPort." "DarkGray"
-}
-
-# Frontend
 if (-not (Test-PortOpen -HostName "127.0.0.1" -Port $FrontendPort)) {
-    Start-FabricFrontend
-    Write-Status "Aguardando frontend ficar disponível..." "DarkGray"
-    $ok = Wait-ForPort -Port $FrontendPort -MaxSeconds 40
+    Start-ArcadiaFrontend
+    Write-Status "A aguardar o servidor de desenvolvimento..." "DarkGray"
+    $ok = Wait-ForPort -Port $FrontendPort -MaxSeconds 45
     if (-not $ok) {
-        Write-Status "AVISO: Frontend não respondeu em 40s. Verifique erros acima." "Yellow"
+        Write-Status "AVISO: Frontend não respondeu a tempo. Verifique a janela do Vite." "Yellow"
     }
 } else {
-    Write-Status "Frontend já está rodando na porta $FrontendPort." "DarkGray"
+    Write-Status "Já existe um serviço na porta $FrontendPort." "DarkGray"
 }
 
-# Abrir navegador
 if (-not $NoOpen) {
     Open-AppWindow
 }
 
-# ── Auto-healing loop ─────────────────────────────────────────────────────────
 if ($Watch) {
-    Write-Status "Modo Watch ativo. Pressione Ctrl+C para sair." "Magenta"
-    Write-Status "Verificando saúde a cada 15 segundos..." "DarkGray"
-
+    Write-Status "Modo Watch: a verificar a porta $FrontendPort a cada 15s (Ctrl+C para sair)." "Magenta"
     while ($true) {
         Start-Sleep -Seconds 15
-
-        $backendOk  = Test-PortOpen -HostName "127.0.0.1" -Port $BackendPort
         $frontendOk = Test-PortOpen -HostName "127.0.0.1" -Port $FrontendPort
-
-        if (-not $backendOk) {
-            Write-Status "Backend caiu! Reiniciando..." "Red"
-            Start-FabricBackend
-        }
-
         if (-not $frontendOk) {
-            Write-Status "Frontend caiu! Reiniciando..." "Red"
-            Start-FabricFrontend
-        }
-
-        if ($backendOk -and $frontendOk) {
-            Write-Status "Serviços OK — backend :$BackendPort  frontend :$FrontendPort" "DarkGray"
+            Write-Status "Frontend não responde na porta $FrontendPort." "Yellow"
+        } else {
+            Write-Status "Serviço OK — :$FrontendPort" "DarkGray"
         }
     }
 } else {
-    Write-Status "Pronto! Acesse: $appUrl" "Green"
-    Write-Status "Dica: use -Watch para reinicialização automática se os serviços caírem." "DarkGray"
+    Write-Status "Pronto. URL: $appUrl" "Green"
+    Write-Status "Defina ARCADIA_GEMINI_API_KEY no .env (tools/Fabric/web) para o chat." "DarkGray"
 }
