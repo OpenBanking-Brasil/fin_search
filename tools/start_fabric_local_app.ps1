@@ -26,7 +26,7 @@ param(
 $ErrorActionPreference = "Stop"
 
 $repoRoot = Split-Path -Parent $PSScriptRoot
-$webDir   = Join-Path $repoRoot "tools\Fabric\web"
+$webDir   = Join-Path $repoRoot "tools\arcadia-web"
 $appUrl   = "http://127.0.0.1:$FrontendPort/login"
 
 function Test-PortOpen {
@@ -49,7 +49,7 @@ function Start-ArcadiaFrontend {
     $frontendCmd = @"
 Set-Location "$webDir"
 `$null = New-Item -ItemType Directory -Force "static/data"
-`$patternDesc = "..\scripts\pattern_descriptions\pattern_descriptions.json"
+`$patternDesc = "scripts\pattern_descriptions\pattern_descriptions.json"
 if (Test-Path `$patternDesc) {
     Copy-Item `$patternDesc "static/data\pattern_descriptions.json" -Force
 }
@@ -122,5 +122,5 @@ if ($Watch) {
     }
 } else {
     Write-Status "Pronto. URL: $appUrl" "Green"
-    Write-Status "Defina ARCADIA_GEMINI_API_KEY no .env (tools/Fabric/web) para o chat." "DarkGray"
+    Write-Status "Defina ARCADIA_GEMINI_API_KEY no .env (tools/arcadia-web) para o chat." "DarkGray"
 }

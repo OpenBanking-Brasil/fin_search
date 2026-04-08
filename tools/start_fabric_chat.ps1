@@ -14,14 +14,14 @@ function Test-PortOpen {
 }
 
 $repoRoot = Split-Path -Parent $PSScriptRoot
-$webDir = Join-Path $repoRoot "tools\Fabric\web"
+$webDir = Join-Path $repoRoot "tools\arcadia-web"
 $port = 5183
 
 if (-not (Test-PortOpen -HostName "127.0.0.1" -Port $port)) {
     $frontendCmd = @"
 Set-Location "$webDir"
 New-Item -ItemType Directory -Force "static/data" | Out-Null
-Copy-Item "..\scripts\pattern_descriptions\pattern_descriptions.json" "static/data\pattern_descriptions.json" -Force
+Copy-Item "scripts\pattern_descriptions\pattern_descriptions.json" "static/data\pattern_descriptions.json" -Force
 npx vite dev --host 127.0.0.1 --port $port
 "@
     Start-Process powershell -ArgumentList @(

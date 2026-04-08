@@ -18,5 +18,5 @@ globs: ["tools/**/*.ps1"]
 - PostgreSQL: 5432
 
 ## Variáveis de ambiente
-- `ARCADIA_GEMINI_API_KEY` ou `GEMINI_API_KEY` → `.env` em `tools/Fabric/web` (servidor; não `VITE_`)
+- `ARCADIA_GEMINI_API_KEY` ou `GEMINI_API_KEY` → `.env` em `tools/arcadia-web` (servidor; não `VITE_`)
 - `FINANCIAL_ASSISTANT_ENCRYPTION_KEY` → env do Docker ou variável de sistema

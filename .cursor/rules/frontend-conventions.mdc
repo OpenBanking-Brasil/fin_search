@@ -1,6 +1,6 @@
 ---
-description: Convenções SvelteKit/TypeScript para o ARCÁDIA OS (tools/Fabric/web)
-globs: ["tools/Fabric/web/src/**/*.{svelte,ts,js}"]
+description: Convenções SvelteKit/TypeScript para o ARCÁDIA OS (tools/arcadia-web)
+globs: ["tools/arcadia-web/src/**/*.{svelte,ts,js}"]
 ---
 
 # Convenções Frontend — ARCÁDIA OS

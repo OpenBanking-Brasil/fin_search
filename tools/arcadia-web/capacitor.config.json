@@ -1,0 +1,8 @@
+{
+  "appId": "com.arcadia.os.finance",
+  "appName": "Arcádia",
+  "webDir": "build",
+  "server": {
+    "androidScheme": "https"
+  }
+}

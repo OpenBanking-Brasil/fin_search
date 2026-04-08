@@ -1,5 +1,5 @@
 # ARCÁDIA OS - Script de Setup (projeto fin_search)
-# Configura o frontend em tools/Fabric/web. A API de IA usa Gemini nas rotas SvelteKit (/api/*).
+# Configura o frontend em tools/arcadia-web. A API de IA usa Gemini nas rotas SvelteKit (/api/*).
 
 param(
     [string]$SupabaseUrl = "",
@@ -32,10 +32,10 @@ Write-Host "ARCÁDIA OS - Setup" -ForegroundColor Cyan
 Write-Host ""
 
 $currentDir = Get-Location
-$webDir = Join-Path $currentDir "tools\Fabric\web"
+$webDir = Join-Path $currentDir "tools\arcadia-web"
 
 if (!(Test-Path $webDir)) {
-    Write-Host "Erro: execute na raiz do repositório (pasta tools/Fabric/web em falta)." -ForegroundColor Red
+    Write-Host "Erro: execute na raiz do repositório (pasta tools/arcadia-web em falta)." -ForegroundColor Red
     exit 1
 }
 
