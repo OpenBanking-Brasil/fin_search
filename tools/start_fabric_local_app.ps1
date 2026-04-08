@@ -1,4 +1,4 @@
-<#
+﻿<#
 .SYNOPSIS
     Inicia o frontend ARCÁDIA OS (SvelteKit) localmente.
     A API de chat e padrões ficam nas rotas /api/* do próprio servidor de desenvolvimento (Gemini no servidor).
