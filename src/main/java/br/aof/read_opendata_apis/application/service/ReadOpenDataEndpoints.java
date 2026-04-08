@@ -33,7 +33,6 @@ import java.security.NoSuchAlgorithmException;
 @Slf4j
 @RequiredArgsConstructor
 public class ReadOpenDataEndpoints {
-    boolean isFirstElement;
     private final OpendataRepository repository;
     private final ErrorOpendataRepository errorRepository;
 
@@ -84,13 +83,7 @@ public class ReadOpenDataEndpoints {
     }
 
     private void saveJsonFile(JsonNode accountData, String companyName, String service, String familyType, String baseUrl) throws IOException {
-        String data;
-        if(isFirstElement)
-            data = "[" + accountData.toString() + ", ";
-        else
-            data = accountData.toString() + ", ";
-        isFirstElement = false;
-        saveData(companyName, familyType, service, baseUrl, data);
+        saveData(companyName, familyType, service, baseUrl, accountData.toString());
     }
 
     private void saveData(String institution, String familyType, String service, String url, String payload){
@@ -126,7 +119,7 @@ public class ReadOpenDataEndpoints {
                 } catch (Exception ex) {
                     return false;
                 }
-                if (nextLink != baseUrl)
+                if (!nextLink.equals(baseUrl))
                     return true;
             }
         } catch (Exception ex){

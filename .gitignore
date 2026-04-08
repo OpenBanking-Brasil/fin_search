@@ -1,0 +1,69 @@
+# Maven / Java
+target/
+pom.xml.tag
+pom.xml.releaseBackup
+pom.xml.versionsBackup
+release.properties
+dependency-reduced-pom.xml
+buildNumber.properties
+.mvn/timing.properties
+
+# JDK / ferramentas locais
+.tools/
+
+# IDE
+.idea/
+*.iml
+*.ipr
+*.iws
+.project
+.classpath
+.settings/
+.vscode/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+# Logs e temporários
+*.log
+*.tmp
+*.temp
+hs_err_pid*
+replay_pid*
+
+# Configuração local / segredos (nunca commitar)
+application-local.yaml
+application-local.yml
+application-secret.yaml
+application-secret.yml
+.env
+.env.*
+# Chave OpenAI local (voice_transcribe)
+tools/voice_transcribe/.openai_key
+tools/voice_transcribe/.notion_token
+tools/voice_transcribe/.notion_page_id
+tools/voice_transcribe/voice_config.json
+*.pem
+*.p12
+*.jks
+
+# Python
+__pycache__/
+*.py[cod]
+
+# Clipboard archive local
+tools/clipboard_archive/data/
+tools/clipboard_archive/clipboard_config.json
+
+# Gmail OAuth (nunca commitar)
+tools/gmail_nubank/token.json
+tools/gmail_nubank/client_secret.json
+tools/gmail_nubank/downloads/
+
+# Outros
+*.bak
