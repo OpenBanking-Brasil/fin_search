@@ -22,7 +22,8 @@ if ($null -eq $lines) {
 $filtered = @($lines | Where-Object { $_ -notmatch "^GEMINI_API_KEY=" })
 $filtered += "GEMINI_API_KEY=$geminiKey"
 
-Set-Content -Path $envFile -Value $filtered -Encoding UTF8
+# Evita BOM no .env para manter compatibilidade com o parser do Fabric.
+[System.IO.File]::WriteAllLines($envFile, $filtered, (New-Object System.Text.UTF8Encoding($false)))
 
 "" | fabric --listpatterns | Out-Null
 "teste local" | fabric --dry-run -V Gemini -m gemini-2.5-flash -p summarize | Out-Null
