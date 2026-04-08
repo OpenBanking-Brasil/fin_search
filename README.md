@@ -1,6 +1,6 @@
-# fin_search — Open Finance + Assistente Financeiro IA
+# fin_search — Open Finance + ARCÁDIA OS
 
-Plataforma que combina leitura de dados abertos do **Open Finance Brasil** com um **Assistente Financeiro baseado em IA** (Fabric + Gemini) para análise, categorização e recomendações sobre eventos financeiros pessoais.
+Plataforma que combina leitura de dados abertos do **Open Finance Brasil** com o **ARCÁDIA OS** - Sistema Operacional de Decisão Autônoma que oferece máximo ganho financeiro com carga mental mínima através de um Parlamento Cognitivo inteligente.
 
 ---
 
@@ -8,22 +8,27 @@ Plataforma que combina leitura de dados abertos do **Open Finance Brasil** com u
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│  Frontend (SvelteKit + Tailwind)  —  tools/Fabric/web       │
-│  AI Autopilot + Workflows + Métricas  —  porta 5199         │
+│  🏛️ ARCÁDIA OS (SvelteKit + Tailwind)  —  porta 5173        │
+│  Parliament + Orchestrator + Dashboard + Constituição      │
 └────────────────────┬────────────────────────────────────────┘
-                     │ HTTP (proxy /api/chat)
+                     │ HTTP + WebSocket
 ┌────────────────────▼────────────────────────────────────────┐
-│  Fabric Go (backend de IA)  —  porta 18080                  │
-│  Patterns: summarize, extract_wisdom, explain_code, …       │
+│  📊 Supabase (PostgreSQL + Auth + API)                      │
+│  RLS + Triggers + Functions + Real-time                     │
 └─────────────────────────────────────────────────────────────┘
 
 ┌─────────────────────────────────────────────────────────────┐
-│  Spring Boot 4 (Java 21)  —  porta 8081                     │
-│  Open Data + Assistente Financeiro REST API                 │
+│  🤖 Fabric Go (backend de IA)  —  porta 18080               │
+│  Patterns + Strategies + Streaming + Auto-routing           │
+└─────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────┐
+│  ☕ Spring Boot 4 (Java 21)  —  porta 8081                  │
+│  Open Finance + Assistente Financeiro REST API             │
 └────────────────────┬────────────────────────────────────────┘
                      │ JDBC
 ┌────────────────────▼────────────────────────────────────────┐
-│  PostgreSQL 16  —  porta 5432                               │
+│  🐘 PostgreSQL 16  —  porta 5432                            │
 └─────────────────────────────────────────────────────────────┘
 ```
 
@@ -38,7 +43,8 @@ Plataforma que combina leitura de dados abertos do **Open Finance Brasil** com u
 | Segurança | Spring Security (HTTP Basic), AES-GCM (dados) |
 | Documentação | springdoc-openapi (Swagger UI em `/swagger-ui.html`) |
 | Frontend | SvelteKit 2, Svelte 5, Tailwind CSS, Skeleton UI |
-| IA | Fabric (Go) + Gemini 2.5 Flash |
+| IA | ARCÁDIA OS + Fabric (Go) + Gemini 2.5 Flash |
+| Database | Supabase (PostgreSQL + Auth + Real-time) |
 | Infra | Docker, Docker Compose, GitHub Actions CI |
 
 ---
@@ -51,6 +57,7 @@ Plataforma que combina leitura de dados abertos do **Open Finance Brasil** com u
 - [Fabric](https://github.com/danielmiessler/Fabric) instalado (winget install Fabric)
 - Node.js 20+ (para o frontend)
 - Chave de API Gemini (obter em https://aistudio.google.com)
+- Conta Supabase (para o ARCÁDIA OS)
 
 ---
 
@@ -81,14 +88,18 @@ API disponível em http://localhost:8081
 Swagger UI: http://localhost:8081/swagger-ui.html  
 Health check: http://localhost:8081/healthcheck
 
-### 4. Subir o Assistente IA (Fabric + UI)
+### 4. Configurar e iniciar ARCÁDIA OS
 
 ```powershell
-# Abre backend Fabric (18080) + frontend (5199) + janela app no Edge
-.\tools\start_fabric_local_app.ps1
+# Setup completo automatizado (Supabase + Fabric + Frontend)
+.\tools\setup_arcadia_os.ps1 -SupabaseUrl "https://xxx.supabase.co" -SupabaseKey "your-key"
+
+# Ou inicie manualmente:
+.\tools\start_fabric_local_app.ps1  # Backend Fabric (18080)
+cd tools\Fabric\web && npm run dev  # Frontend ARCÁDIA OS (5173)
 ```
 
-Ou como atalho no Desktop: **"Fabric Local App"**
+**ARCÁDIA OS** disponível em http://localhost:5173
 
 ---
 
@@ -208,12 +219,109 @@ Fonte (email/CSV/OCR/manual/mensagem/Open Finance)
 
 ---
 
+## 🏛️ ARCÁDIA OS — Sistema Operacional de Decisão Autônoma
+
+### Visão Geral
+
+O **ARCÁDIA OS** é um sistema inteligente que transforma suas finanças em uma infraestrutura de execução contínua, oferecendo **máximo ganho financeiro com carga mental mínima** através de decisões automatizadas e fundamentadas.
+
+### Funcionalidades Principais
+
+#### 🗣️ Parlamento Cognitivo
+Sistema de debate multi-perspectiva com 5 agentes especializados:
+- **Dr. Prudência** (Conservador): Foca na segurança e gestão de riscos
+- **Alex Crescimento** (Agressivo): Busca oportunidades de alto retorno  
+- **Dra. Psique** (Comportamental): Analisa o impacto psicológico
+- **Prof. Números** (Quantitativo): Decisões baseadas em dados
+- **Juíza Ética** (Ética): Garante alinhamento com valores pessoais
+
+#### 📜 Constituição Financeira
+- Princípios e regras personalizáveis que guiam todas as decisões
+- Versionamento automático das alterações
+- Interface de edição intuitiva
+- Integração completa com o sistema de decisões
+
+#### 📊 Dashboard Inteligente
+- **KPIs Financeiros**: Impacto líquido, taxa de sucesso, confiança média
+- **Status do Sistema**: Execuções, precisão, sessões ativas, riscos
+- **Últimas Decisões**: Histórico com detalhes completos
+- Auto-refresh em tempo real
+
+#### 🤖 Orquestrador Inteligente
+- Detecta automaticamente quando acionar o Parlamento
+- Integração híbrida: Parliament + Fabric
+- Persistência automática de todas as decisões
+
+#### 📈 Histórico Completo
+- Todas as decisões com filtros e busca
+- Detalhes expandidos (riscos, planos, metadados)
+- Auditoria completa do processo de decisão
+
+#### 🚀 Onboarding Interativo
+- Introdução passo-a-passo ao sistema
+- Tutorial do Parlamento Cognitivo
+- Guia de uso prático
+
+### Como Usar o ARCÁDIA OS
+
+1. **Acesse**: http://localhost:5173
+2. **Faça login** com Magic Link ou email/senha
+3. **Complete o onboarding** interativo
+4. **Faça perguntas financeiras** no chat:
+   ```
+   "Devo investir R$ 10.000 em ações ou deixar na poupança?"
+   ```
+5. **O sistema automaticamente**:
+   - Aciona o Parlamento Cognitivo
+   - Analisa com base na sua constituição
+   - Apresenta decisão fundamentada
+   - Salva tudo no histórico
+
+### Documentação Completa
+
+Consulte `tools/Fabric/web/ARCADIA_README.md` para documentação detalhada incluindo:
+- Arquitetura completa
+- Schema do banco de dados
+- Guias de desenvolvimento
+- Scripts de automação
+
+---
+
 ## Frontend IA — Funcionalidades
 
 - **AI Autopilot:** seleciona automaticamente o pattern e estratégia com base no texto (heurísticas + `suggest_pattern` via backend)
 - **Workflows:** atalhos pré-configurados (Resumir, Extrair Insights, Explicar Código, Revisar Código, Comparar, Melhorar Texto, Criar Plano)
 - **ResponseRefiner:** refina respostas de baixa confiança com `improve_writing`
 - **Métricas de sessão:** painel com taxa de sucesso, fallback, tempo médio e confiança do autopilot
+
+---
+
+## 🛠️ Scripts de Automação
+
+### ARCÁDIA OS
+- `setup_arcadia_os.ps1`: Setup completo automatizado (Supabase + Fabric + Frontend)
+- `start_fabric_local_app.ps1`: Launcher com auto-healing para backend + frontend
+- `fabric_aliases.ps1`: Cria aliases PowerShell para todos os patterns Fabric
+- `fabric_update.ps1`: Atualiza patterns, strategies e binário Fabric
+
+### Fabric Tradicional  
+- `fabric_gemini_setup.ps1`: Configuração interativa da API Gemini
+- Atalho Desktop: **"Fabric Local App"** (criado automaticamente)
+
+### Uso Rápido
+```powershell
+# Setup completo do ARCÁDIA OS
+.\tools\setup_arcadia_os.ps1 -SupabaseUrl "https://xxx.supabase.co" -SupabaseKey "your-key"
+
+# Iniciar serviços
+.\tools\start_fabric_local_app.ps1
+
+# Atualizar Fabric
+.\tools\fabric_update.ps1
+
+# Criar aliases PowerShell
+.\tools\fabric_aliases.ps1
+```
 
 ---
 
