@@ -9,6 +9,10 @@ server:
 spring:
   application:
     name: data-pump-service
+  # Java 21 Virtual Threads — aumenta throughput em operações I/O-bound sem criar threads OS extras.
+  threads:
+    virtual:
+      enabled: true
   # Tarefas agendadas (@Scheduled) desligadas — não há trabalho em segundo plano ao subir a app.
   # Para voltar a sincronizar dados automaticamente: muda para true e reinicia.
   task:
@@ -52,7 +56,21 @@ open-finance:
     # Vazio = todas as instituições com opendata. Ex.: [ "Nubank", "Nu" ] para restringir.
     institution-include: []
 
+spring:
+  security:
+    user:
+      name: ${APP_API_USER:admin}
+      password: ${APP_API_PASSWORD:change-me-in-production}
+
 financial-assistant:
   security:
     # Trocar em produção por segredo forte gerenciado por cofre de segredos.
     encryption-key: ${FINANCIAL_ASSISTANT_ENCRYPTION_KEY:change-this-key-32-bytes-minimum!}
+
+springdoc:
+  api-docs:
+    path: /v3/api-docs
+  swagger-ui:
+    path: /swagger-ui.html
+    operations-sorter: alpha
+    tags-sorter: alpha

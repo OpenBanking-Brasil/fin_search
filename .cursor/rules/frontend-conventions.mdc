@@ -1,0 +1,38 @@
+---
+description: Convenções SvelteKit/TypeScript para o frontend Fabric (tools/Fabric/web)
+globs: ["tools/Fabric/web/src/**/*.{svelte,ts,js}"]
+---
+
+# Convenções Frontend — Fabric Web
+
+## Stack
+- SvelteKit 2 + Svelte 5 + TypeScript + Tailwind CSS + Skeleton UI
+- Vite como bundler; rodar em `http://127.0.0.1:5199`
+- Backend Fabric Go em `http://127.0.0.1:18080`
+
+## Serviços e Stores
+- `ChatService` → única forma de enviar mensagens ao backend
+- `IntentRouterService.route()` → para selecionar pattern/strategy automaticamente
+- `ResponseRefinerService.refine()` → refinar resposta se confiança < 0.85
+- `recordEvent()` de `autopilot-metrics-store` → registrar cada execução do autopilot
+- Stores: sempre usar `$store` no template, `get(store)` em scripts TS
+
+## Regras
+- Nunca fazer `fetch` direto nos componentes — usar os services de `$lib/services/`
+- Toda lógica de autopilot via `IntentRouterService`, não inline em componentes
+- Ao adicionar nova heurística de pattern: editar `RULES[]` em `IntentRouterService.ts`
+- Métricas: chamar `recordEvent()` após cada resposta do autopilot
+- Erros: exibir no `messageStore` com `format: 'plain'` e role `'system'`
+
+## Portas locais
+- Backend: 18080
+- Frontend: 5199
+
+## Workflows predefinidos
+- Definidos em `$lib/config/workflows.ts`
+- Usar `WORKFLOWS` para UI de seleção rápida
+
+## Convenções de estilo
+- Classes de painel: `panel-card`, `panel-card-soft`, `panel-title`, `panel-subtitle`, `panel-meta`
+- Scroll: `scrollbar-thin scrollbar-thumb-white/10 scrollbar-track-transparent`
+- Não usar `console.log` em produção — remover antes de commit
