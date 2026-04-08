@@ -2,7 +2,7 @@
 
 Plataforma que combina leitura de dados abertos do **Open Finance Brasil** com o **ARCÁDIA OS** - Sistema Operacional de Decisão Autônoma que oferece máximo ganho financeiro com carga mental mínima através de um Parlamento Cognitivo inteligente.
 
-**Propriedade:** este repositório (**fin_search**) é o projeto principal; o **ARCÁDIA OS** (UI, Parlamento, Orquestrador, Supabase, rotas `/api` com Gemini) vive em `tools/Fabric/web`. O código histórico mantém a pasta `Fabric` no caminho; **não** é necessário o binário Fabric nem a porta 18080.
+**Propriedade:** este repositório (**fin_search**) é o projeto principal; o **ARCÁDIA OS** (UI, Parlamento, Orquestrador, Supabase, rotas `/api` com Gemini) vive em **`tools/arcadia-web`**. **Não** é necessário o binário Fabric (danielmiessler/Fabric) nem a porta 18080.
 
 ---
 
@@ -52,7 +52,7 @@ Plataforma que combina leitura de dados abertos do **Open Finance Brasil** com o
 - Maven (ou use `./mvnw`)
 - Docker + Docker Compose
 - Node.js 20+ (para o frontend ARCÁDIA)
-- Chave de API Gemini no `.env` do web (`ARCADIA_GEMINI_API_KEY`; ver `tools/Fabric/web/env.example`)
+- Chave de API Gemini no `.env` do web (`ARCADIA_GEMINI_API_KEY`; ver `tools/arcadia-web/env.example`)
 - Conta Supabase (para o ARCÁDIA OS)
 
 ---
@@ -85,7 +85,7 @@ Health check: http://localhost:8081/healthcheck
 
 # Ou inicie o Vite (API em /api no mesmo processo):
 .\tools\start_fabric_local_app.ps1
-# cd tools\Fabric\web && npm run dev
+# cd tools\arcadia-web && npm run dev
 ```
 
 **ARCÁDIA OS** — URL mostrada pelo Vite (por defeito `http://127.0.0.1:5199`).
@@ -270,7 +270,7 @@ Sistema de debate multi-perspectiva com 5 agentes especializados:
 
 ### Documentação Completa
 
-Consulte `tools/Fabric/web/ARCADIA_README.md` para documentação detalhada incluindo:
+Consulte `tools/arcadia-web/ARCADIA_README.md` para documentação detalhada incluindo:
 - Arquitetura completa
 - Schema do banco de dados
 - Guias de desenvolvimento
