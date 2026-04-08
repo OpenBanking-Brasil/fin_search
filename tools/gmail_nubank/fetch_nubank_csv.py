@@ -2,7 +2,7 @@ import argparse
 import base64
 import os
 import re
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Dict, List, Optional
 
@@ -115,7 +115,7 @@ def extract_message_date(headers: List[Dict]) -> str:
         parsed = datetime.strptime(date_header[:25], "%a, %d %b %Y %H:%M:%S")
         return parsed.strftime("%Y-%m-%d")
     except ValueError:
-        return datetime.utcnow().strftime("%Y-%m-%d")
+        return datetime.now(timezone.utc).strftime("%Y-%m-%d")
 
 
 def download_attachment(service, message_id: str, attachment_id: str) -> bytes:

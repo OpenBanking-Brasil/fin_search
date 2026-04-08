@@ -1,0 +1,18 @@
+# --- Gmail (tools/gmail_nubank/fetch_nubank_csv.py) ---
+google-auth>=2.0
+google-auth-oauthlib>=1.0
+google-auth-httplib2>=0.2
+google-api-python-client>=2.0
+
+# --- Voz / PTT (tools/voice_transcribe/) — instalar o que usar ---
+keyboard>=0.13
+numpy>=1.24
+pyperclip>=1.8
+pystray>=0.19
+sounddevice>=0.4
+faster-whisper>=1.0
+Pillow>=10.0
+
+# --- Opcional: Notion / outros scripts ---
+# requests
+# httpx

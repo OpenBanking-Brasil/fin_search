@@ -60,5 +60,10 @@ __pycache__/
 tools/clipboard_archive/data/
 tools/clipboard_archive/clipboard_config.json
 
+# Gmail OAuth (nunca commitar)
+tools/gmail_nubank/token.json
+tools/gmail_nubank/client_secret.json
+tools/gmail_nubank/downloads/
+
 # Outros
 *.bak
