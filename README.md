@@ -71,3 +71,21 @@ ou
 $ mvn spring-boot:run 
 ```
 
+## Assistente Financeiro IA
+
+Foi adicionado um módulo de assistente financeiro em `br.aof.read_opendata_apis.financialassistant` com:
+
+- Ingestão multicanal (`/api/v1/financial-assistant/ingest/*`) para e-mail, CSV, OCR, entradas manuais, mensagens e Open Finance.
+- Pipeline canônico com normalização e deduplicação por fingerprint SHA-256.
+- Classificação automática, detecção de padrões e previsão de caixa (`/analysis/*`).
+- Recomendação explicável com aprovação humana obrigatória (`/advisor/recommendations/*`).
+- Governança inicial de segurança: consentimentos, auditoria e criptografia utilitária (`/security/*`).
+
+Configuração de criptografia:
+
+```yaml
+financial-assistant:
+  security:
+    encryption-key: ${FINANCIAL_ASSISTANT_ENCRYPTION_KEY:change-this-key-32-bytes-minimum!}
+```
+

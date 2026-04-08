@@ -51,3 +51,8 @@ open-finance:
   opendata:
     # Vazio = todas as instituições com opendata. Ex.: [ "Nubank", "Nu" ] para restringir.
     institution-include: []
+
+financial-assistant:
+  security:
+    # Trocar em produção por segredo forte gerenciado por cofre de segredos.
+    encryption-key: ${FINANCIAL_ASSISTANT_ENCRYPTION_KEY:change-this-key-32-bytes-minimum!}
