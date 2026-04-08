@@ -1,206 +1,180 @@
 <#
 .SYNOPSIS
-    Inicia o Fabric backend (REST API) e o frontend (SvelteKit) localmente.
-
-.DESCRIPTION
-    - Verifica se backend/frontend já estão rodando antes de iniciar novamente.
-    - Suporta --api-key para proteger a API REST do Fabric.
-    - Aguarda health-check real dos serviços antes de abrir o browser.
-    - Auto-healing: reinicia backend e/ou frontend se pararem.
-    - Abre a UI no modo "app" (sem barra de navegação do browser).
-
-.PARAMETER BackendPort
-    Porta do backend Fabric REST. Padrão: 18080.
-
-.PARAMETER FrontendPort
-    Porta do frontend SvelteKit. Padrão: 5199.
+    Inicia o backend Fabric e o frontend SvelteKit localmente,
+    com auto-healing (reinicia automaticamente se os processos caírem).
 
 .PARAMETER ApiKey
-    Chave de API para proteger o servidor Fabric (--api-key). Opcional.
+    Chave de API para proteger as rotas do servidor Fabric.
+    Se não informado, usa a variável de ambiente FABRIC_API_KEY.
+
+.PARAMETER BackendPort
+    Porta do backend Fabric (padrão: 18080)
+
+.PARAMETER FrontendPort
+    Porta do frontend SvelteKit (padrão: 5199)
+
+.PARAMETER NoOpen
+    Não abrir o navegador automaticamente.
 
 .PARAMETER Watch
-    Mantém o script rodando e reinicia serviços se pararem (auto-healing).
-
-.PARAMETER SkipBrowser
-    Não abre o browser após iniciar os serviços.
+    Mantém o script rodando e reinicia processos caídos a cada 15s (auto-healing).
 
 .EXAMPLE
     .\start_fabric_local_app.ps1
     .\start_fabric_local_app.ps1 -ApiKey "minha-chave-secreta"
     .\start_fabric_local_app.ps1 -Watch
 #>
+
 param(
-    [int]$BackendPort  = 18080,
-    [int]$FrontendPort = 5199,
-    [string]$ApiKey    = "",
-    [switch]$Watch,
-    [switch]$SkipBrowser
+    [string] $ApiKey      = $env:FABRIC_API_KEY,
+    [int]    $BackendPort = 18080,
+    [int]    $FrontendPort= 5199,
+    [switch] $NoOpen,
+    [switch] $Watch
 )
 
-Set-StrictMode -Version Latest
-$ErrorActionPreference = "Continue"
+$ErrorActionPreference = "Stop"
 
-$RepoRoot = "D:\Users\caioc\Documents\GitHub\fin_search"
-$WebDir   = Join-Path $RepoRoot "tools\Fabric\web"
-$AppUrl   = "http://127.0.0.1:$FrontendPort/chat"
+$repoRoot = "D:\Users\caioc\Documents\GitHub\fin_search"
+$webDir   = Join-Path $repoRoot "tools\Fabric\web"
+$appUrl   = "http://127.0.0.1:$FrontendPort/chat"
 
-# ── Helpers ──────────────────────────────────────────────────────────────────
-function Write-Step($msg) { Write-Host "  → $msg" -ForegroundColor Cyan }
-function Write-Done($msg) { Write-Host "  ✓ $msg" -ForegroundColor Green }
-function Write-Warn($msg) { Write-Host "  ! $msg" -ForegroundColor Yellow }
-function Write-Fail($msg) { Write-Host "  ✗ $msg" -ForegroundColor Red }
-
-function Test-PortOpen([string]$h, [int]$p) {
+# ── Helpers ───────────────────────────────────────────────────────────────────
+function Test-PortOpen {
+    param([string]$HostName, [int]$Port)
     try {
-        $c = New-Object System.Net.Sockets.TcpClient
-        $a = $c.BeginConnect($h, $p, $null, $null)
-        $ok = $a.AsyncWaitHandle.WaitOne(500)
-        $c.Close()
-        return $ok
-    } catch { return $false }
+        $conn = Test-NetConnection -ComputerName $HostName -Port $Port -WarningAction SilentlyContinue
+        return [bool]$conn.TcpTestSucceeded
+    } catch {
+        return $false
+    }
 }
 
-function Wait-ForPort([string]$h, [int]$p, [int]$maxSeconds = 30, [string]$label = "") {
-    $deadline = (Get-Date).AddSeconds($maxSeconds)
-    while ((Get-Date) -lt $deadline) {
-        if (Test-PortOpen $h $p) { return $true }
-        Write-Host "." -NoNewline
-        Start-Sleep -Milliseconds 800
+function Write-Status {
+    param([string]$Msg, [string]$Color = "Cyan")
+    $ts = Get-Date -Format "HH:mm:ss"
+    Write-Host "[$ts] $Msg" -ForegroundColor $Color
+}
+
+function Start-FabricBackend {
+    $serveCmd = "`"`" | fabric --serve --address :$BackendPort"
+    if ($ApiKey) {
+        $serveCmd = "`"`" | fabric --serve --address :$BackendPort --api-key `"$ApiKey`""
     }
-    Write-Host ""
+
+    Start-Process powershell -ArgumentList @(
+        "-NoExit",
+        "-ExecutionPolicy", "Bypass",
+        "-Command", $serveCmd
+    ) -WorkingDirectory $repoRoot | Out-Null
+
+    Write-Status "Backend Fabric iniciado na porta $BackendPort." "Green"
+}
+
+function Start-FabricFrontend {
+    $frontendCmd = @"
+Set-Location "$webDir"
+`$null = New-Item -ItemType Directory -Force "static/data"
+`$patternDesc = "..\scripts\pattern_descriptions\pattern_descriptions.json"
+if (Test-Path `$patternDesc) {
+    Copy-Item `$patternDesc "static/data\pattern_descriptions.json" -Force
+}
+`$env:FABRIC_BASE_URL = "http://127.0.0.1:$BackendPort"
+npx vite dev --host 127.0.0.1 --port $FrontendPort
+"@
+
+    Start-Process powershell -ArgumentList @(
+        "-NoExit",
+        "-ExecutionPolicy", "Bypass",
+        "-Command", $frontendCmd
+    ) -WorkingDirectory $repoRoot | Out-Null
+
+    Write-Status "Frontend SvelteKit iniciado na porta $FrontendPort." "Green"
+}
+
+function Open-AppWindow {
+    if (Get-Command msedge -ErrorAction SilentlyContinue) {
+        Start-Process "msedge" "--app=$appUrl" | Out-Null
+    } elseif (Get-Command chrome -ErrorAction SilentlyContinue) {
+        Start-Process "chrome" "--app=$appUrl" | Out-Null
+    } else {
+        Start-Process $appUrl | Out-Null
+    }
+    Write-Status "Janela do app aberta: $appUrl" "Cyan"
+}
+
+function Wait-ForPort {
+    param([int]$Port, [int]$MaxSeconds = 30)
+    $elapsed = 0
+    while ($elapsed -lt $MaxSeconds) {
+        if (Test-PortOpen -HostName "127.0.0.1" -Port $Port) { return $true }
+        Start-Sleep -Seconds 1
+        $elapsed++
+    }
     return $false
 }
 
-function Start-BackendProcess {
-    $apiKeyFlag = if ($ApiKey) { "--api-key `"$ApiKey`"" } else { "" }
-    $cmd = "`"`" | fabric --serve --address :$BackendPort $apiKeyFlag"
-    Write-Step "Iniciando backend Fabric na porta $BackendPort..."
-    $proc = Start-Process powershell -ArgumentList @(
-        "-NoExit", "-ExecutionPolicy", "Bypass", "-Command", $cmd
-    ) -WorkingDirectory $RepoRoot -PassThru
-    return $proc
+# ── Inicialização ─────────────────────────────────────────────────────────────
+Write-Status "Iniciando Fabric Local App..." "White"
+if ($ApiKey) {
+    Write-Status "Modo seguro: API key configurada." "Yellow"
 }
 
-function Start-FrontendProcess {
-    $cmd = @"
-Set-Location "$WebDir"
-if (-not (Test-Path "static\data")) { New-Item -ItemType Directory -Force "static\data" | Out-Null }
-`$src = "..\scripts\pattern_descriptions\pattern_descriptions.json"
-if (Test-Path `$src) { Copy-Item `$src "static\data\pattern_descriptions.json" -Force }
-`$env:FABRIC_BASE_URL = "http://127.0.0.1:$BackendPort"
-`$env:VITE_FABRIC_BASE_URL = "http://127.0.0.1:$BackendPort"
-npx vite dev --host 127.0.0.1 --port $FrontendPort
-"@
-    Write-Step "Iniciando frontend SvelteKit na porta $FrontendPort..."
-    $proc = Start-Process powershell -ArgumentList @(
-        "-NoExit", "-ExecutionPolicy", "Bypass", "-Command", $cmd
-    ) -WorkingDirectory $RepoRoot -PassThru
-    return $proc
-}
-
-function Open-AppBrowser {
-    if ($SkipBrowser) { return }
-    $msedge   = (Get-Command "msedge"   -ErrorAction SilentlyContinue)?.Source
-    $chrome   = (Get-Command "chrome"   -ErrorAction SilentlyContinue)?.Source
-    $chromium = (Get-Command "chromium" -ErrorAction SilentlyContinue)?.Source
-    $edge64   = "C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe"
-    $edgeAlt  = "C:\Program Files\Microsoft\Edge\Application\msedge.exe"
-
-    if     ($msedge)                  { Start-Process $msedge   "--app=$AppUrl" }
-    elseif (Test-Path $edge64)        { Start-Process $edge64   "--app=$AppUrl" }
-    elseif (Test-Path $edgeAlt)       { Start-Process $edgeAlt  "--app=$AppUrl" }
-    elseif ($chrome)                  { Start-Process $chrome   "--app=$AppUrl" }
-    elseif ($chromium)                { Start-Process $chromium "--app=$AppUrl" }
-    else                              { Start-Process $AppUrl }
-}
-
-# ── Início ────────────────────────────────────────────────────────────────────
-Write-Host ""
-Write-Host "  Fabric Local App" -ForegroundColor Magenta
-Write-Host "  Backend : http://127.0.0.1:$BackendPort" -ForegroundColor DarkGray
-Write-Host "  Frontend: $AppUrl" -ForegroundColor DarkGray
-if ($ApiKey) { Write-Host "  API Key : ***" -ForegroundColor DarkGray }
-Write-Host ""
-
-# ── Backend ───────────────────────────────────────────────────────────────────
-$backendProc = $null
-if (Test-PortOpen "127.0.0.1" $BackendPort) {
-    Write-Done "Backend já está rodando na porta $BackendPort."
-} else {
-    $backendProc = Start-BackendProcess
-    Write-Host "  Aguardando backend" -NoNewline
-    if (Wait-ForPort "127.0.0.1" $BackendPort 40 "backend") {
-        Write-Done " Backend pronto!"
-    } else {
-        Write-Fail " Timeout aguardando backend. Verifique a janela do PowerShell."
+# Backend
+if (-not (Test-PortOpen -HostName "127.0.0.1" -Port $BackendPort)) {
+    Start-FabricBackend
+    Write-Status "Aguardando backend ficar disponível..." "DarkGray"
+    $ok = Wait-ForPort -Port $BackendPort -MaxSeconds 20
+    if (-not $ok) {
+        Write-Status "AVISO: Backend não respondeu em 20s. Verifique erros acima." "Yellow"
     }
-}
-
-# ── Frontend ──────────────────────────────────────────────────────────────────
-$frontendProc = $null
-if (Test-PortOpen "127.0.0.1" $FrontendPort) {
-    Write-Done "Frontend já está rodando na porta $FrontendPort."
 } else {
-    $frontendProc = Start-FrontendProcess
-    Write-Host "  Aguardando frontend" -NoNewline
-    if (Wait-ForPort "127.0.0.1" $FrontendPort 60 "frontend") {
-        Write-Done " Frontend pronto!"
-    } else {
-        Write-Warn " Timeout aguardando frontend. Tentando abrir mesmo assim..."
+    Write-Status "Backend já está rodando na porta $BackendPort." "DarkGray"
+}
+
+# Frontend
+if (-not (Test-PortOpen -HostName "127.0.0.1" -Port $FrontendPort)) {
+    Start-FabricFrontend
+    Write-Status "Aguardando frontend ficar disponível..." "DarkGray"
+    $ok = Wait-ForPort -Port $FrontendPort -MaxSeconds 40
+    if (-not $ok) {
+        Write-Status "AVISO: Frontend não respondeu em 40s. Verifique erros acima." "Yellow"
     }
+} else {
+    Write-Status "Frontend já está rodando na porta $FrontendPort." "DarkGray"
 }
 
-# ── Abrir browser ─────────────────────────────────────────────────────────────
-Open-AppBrowser
-Write-Done "App aberto em: $AppUrl"
-
-# ── Auto-healing ──────────────────────────────────────────────────────────────
-if (-not $Watch) {
-    Write-Host ""
-    Write-Host "  Dica: Use -Watch para manter o script rodando e reiniciar serviços automaticamente." -ForegroundColor DarkGray
-    exit 0
+# Abrir navegador
+if (-not $NoOpen) {
+    Open-AppWindow
 }
 
-Write-Host ""
-Write-Host "  Modo Watch ativo — reiniciará serviços automaticamente se pararem." -ForegroundColor Yellow
-Write-Host "  Pressione Ctrl+C para encerrar.`n" -ForegroundColor DarkGray
+# ── Auto-healing loop ─────────────────────────────────────────────────────────
+if ($Watch) {
+    Write-Status "Modo Watch ativo. Pressione Ctrl+C para sair." "Magenta"
+    Write-Status "Verificando saúde a cada 15 segundos..." "DarkGray"
 
-$healCooldown = 15  # segundos entre tentativas de reinício
-$lastHealBackend  = [datetime]::MinValue
-$lastHealFrontend = [datetime]::MinValue
+    while ($true) {
+        Start-Sleep -Seconds 15
 
-while ($true) {
-    Start-Sleep -Seconds 5
+        $backendOk  = Test-PortOpen -HostName "127.0.0.1" -Port $BackendPort
+        $frontendOk = Test-PortOpen -HostName "127.0.0.1" -Port $FrontendPort
 
-    # ── Verificar backend ─────────────────────────────────────────────────────
-    if (-not (Test-PortOpen "127.0.0.1" $BackendPort)) {
-        $now = Get-Date
-        if (($now - $lastHealBackend).TotalSeconds -ge $healCooldown) {
-            Write-Warn "Backend caiu! Reiniciando..."
-            $lastHealBackend = $now
-            $backendProc = Start-BackendProcess
-            Write-Host "  Aguardando backend" -NoNewline
-            if (Wait-ForPort "127.0.0.1" $BackendPort 40) {
-                Write-Done " Backend recuperado!"
-            } else {
-                Write-Fail " Falha ao recuperar backend."
-            }
+        if (-not $backendOk) {
+            Write-Status "Backend caiu! Reiniciando..." "Red"
+            Start-FabricBackend
+        }
+
+        if (-not $frontendOk) {
+            Write-Status "Frontend caiu! Reiniciando..." "Red"
+            Start-FabricFrontend
+        }
+
+        if ($backendOk -and $frontendOk) {
+            Write-Status "Serviços OK — backend :$BackendPort  frontend :$FrontendPort" "DarkGray"
         }
     }
-
-    # ── Verificar frontend ────────────────────────────────────────────────────
-    if (-not (Test-PortOpen "127.0.0.1" $FrontendPort)) {
-        $now = Get-Date
-        if (($now - $lastHealFrontend).TotalSeconds -ge $healCooldown) {
-            Write-Warn "Frontend caiu! Reiniciando..."
-            $lastHealFrontend = $now
-            $frontendProc = Start-FrontendProcess
-            Write-Host "  Aguardando frontend" -NoNewline
-            if (Wait-ForPort "127.0.0.1" $FrontendPort 60) {
-                Write-Done " Frontend recuperado!"
-            } else {
-                Write-Fail " Falha ao recuperar frontend."
-            }
-        }
-    }
+} else {
+    Write-Status "Pronto! Acesse: $appUrl" "Green"
+    Write-Status "Dica: use -Watch para reinicialização automática se os serviços caírem." "DarkGray"
 }
