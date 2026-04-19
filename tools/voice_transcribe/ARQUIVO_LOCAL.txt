@@ -1,0 +1,58 @@
+Arquivo local (Área de trabalho\LocalVoiceArchive por defeito)
+==============================================================
+A pasta fica no Ambiente de trabalho / Desktop (ou OneDrive\Desktop
+se for o caso). Para outro sítio, use archive.root em voice_config.json.
+
+ARRANQUE COM O WINDOWS (sempre ativo como o asterisco)
+------------------------------------------------------
+Execute uma vez: instalar_arranque_automatico.bat
+Detalhes: ARRANQUE.txt
+
+ORGANIZACAO POR DATA E HORA
+---------------------------
+Audio (voz, cada gravacao PTT):
+  audio\YYYY-MM-DD\voz_YYYY-MM-DD_HH-MM-SS_mmm.opus
+  Pasta = dia; nome do ficheiro = data + hora + milesimos.
+
+Texto (transcricao da voz + opcional teclado):
+  text\YYYY-MM-DD.zip
+  Dentro, um .txt por evento:
+    YYYY-MM-DD_HH-MM-SS_mmm_transcricao.txt
+    YYYY-MM-DD_HH-MM-SS_mmm_teclado.txt
+  Cada .txt comeca com:
+    data: YYYY-MM-DD
+    hora: HH:MM:SS
+    tipo: transcricao | teclado
+    ---
+    (conteudo)
+
+Teclado: "keyboard_log" true por defeito (tudo o que digita, em blocos
+periodicos). Ponha false em voice_config.json se nao quiser.
+
+DIALOGO AUTOMATICO (dialogue_detection)
+----------------------------------------
+Quando enabled=true, o microfone fica a escutar sempre: um buffer circular
+guarda os ultimos pre_roll_seconds de audio ANTES de detetar fala; ao
+detetar voz e depois silencio, grava Opus + transcreve (tipo "dialogo_*.opus"
+e tipo "dialogo" no zip). O PTT (asterisco) continua; durante PTT o
+detetor de dialogo pausa para nao duplicar.
+
+Ajuste rms_speech_start / rms_speech_end se houver ambiente ruidoso
+(valores maiores = menos sensivel). auto_paste=false so grava sem colar.
+
+OUTRAS APPS (Notion, Word, browser, dictacao do Windows)
+---------------------------------------------------------
+O Windows entrega normalmente o MESMO microfone a varias aplicacoes em
+modo partilhado. Enquanto este programa estiver a correr com deteccao de
+dialogo ligada, o vosso audio de voz — incluindo quando falam para
+transcrever noutra janela — e o mesmo sinal que entra aqui, desde que:
+  - seja o mesmo dispositivo de entrada (veja Definicoes > Som);
+  - nenhuma app force modo exclusivo no microfone (raro).
+
+Para forcar o mesmo microfone que outra app usa, defina em voice_config.json:
+  "input_device": "nome parcial do microfone"
+ou o indice numerico (use "list_audio_devices": true para listar).
+
+Se nao aparecer audio, verifique qual microfone a outra app usa e alinhe
+input_device. Nao e possivel interceptar o servico de nuvem de outra app;
+só o que o microfone capta localmente.

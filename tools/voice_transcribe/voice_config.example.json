@@ -1,0 +1,32 @@
+{
+  "input_device": null,
+  "list_audio_devices": false,
+  "hotkey": "asterisk",
+  "whisper_model": "tiny",
+  "whisper_device": "cpu",
+  "whisper_compute_type": "int8",
+  "whisper_cpu_threads": 6,
+  "whisper_num_workers": 1,
+  "language": "auto",
+  "paste_delay": 0.12,
+  "archive": {
+    "enabled": true,
+    "root": "",
+    "save_audio_opus": true,
+    "opus_bitrate_kbps": 24,
+    "save_transcripts": true,
+    "keyboard_log": true,
+    "keyboard_flush_seconds": 45
+  },
+  "dialogue_detection": {
+    "enabled": true,
+    "pre_roll_seconds": 1.0,
+    "silence_to_end_seconds": 0.55,
+    "min_speech_seconds": 0.25,
+    "cooldown_seconds": 0.8,
+    "rms_speech_start": 5.0,
+    "rms_speech_end": 2.2,
+    "noise_floor_leak": 0.05,
+    "auto_paste": true
+  }
+}

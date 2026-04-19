@@ -1,0 +1,22 @@
+---
+description: Convenções PowerShell para scripts de automação em tools/
+globs: ["tools/**/*.ps1"]
+---
+
+# Convenções PowerShell — fin_search
+
+## Regras obrigatórias
+- Sempre iniciar com `$ErrorActionPreference = "Stop"`
+- Escrever `.env` sem BOM: `[System.IO.File]::WriteAllLines($path, $lines, (New-Object System.Text.UTF8Encoding($false)))`
+- Scripts opcionais do Fabric CLI (se usados): redirecionar stdin → `"" | fabric --comando`
+- Verificar porta antes de subir serviço com `Test-NetConnection`
+- Usar `Join-Path` para caminhos — nunca concatenação de string com `\`
+
+## Portas dos serviços
+- ARCÁDIA (Vite + /api): 5199 (típico)
+- Spring Boot: 8081
+- PostgreSQL: 5432
+
+## Variáveis de ambiente
+- `ARCADIA_GEMINI_API_KEY` ou `GEMINI_API_KEY` → `.env` em `tools/Fabric/web` (servidor; não `VITE_`)
+- `FINANCIAL_ASSISTANT_ENCRYPTION_KEY` → env do Docker ou variável de sistema

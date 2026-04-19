@@ -1,0 +1,28 @@
+Sempre ativo com o Windows (igual ao uso do asterisco)
+=======================================================
+
+O programa transcribe_ptt.py e o mesmo para:
+  - arranque automatico;
+  - icone na bandeja do sistema;
+  - tecla asterisco (PTT) e restantes funcoes.
+
+Para ficar sempre a correr depois de ligar o PC e iniciar sessao:
+
+  1) Uma vez: duplo clique em:
+       instalar_arranque_automatico.bat
+
+  2) Reiniciar (ou terminar sessao e voltar a entrar).
+
+Fica instalado:
+  - um atalho na pasta "Inicializar" do Windows;
+  - uma tarefa agendada "FinSearch-TranscricaoPTT" ao iniciar sessao
+    (reforço se a pasta Inicializar falhar).
+
+Se abrir o programa duas vezes, a segunda instancia fecha sozinha
+(um unico processo usa o microfone e o asterisco).
+
+Para remover o arranque automatico:
+       desinstalar_arranque_automatico.bat
+
+Nota: o Python tem de estar no PATH (py ou python), como quando corre
+manualmente iniciar_transcricao.bat.

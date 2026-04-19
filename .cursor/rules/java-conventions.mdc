@@ -1,0 +1,39 @@
+---
+description: Convenções Java/Spring Boot para o projeto fin_search
+globs: ["src/**/*.java"]
+---
+
+# Convenções Java — fin_search
+
+## Stack
+- Java 21 + Spring Boot 4 + Lombok + JPA/Hibernate + PostgreSQL
+- Virtual threads habilitadas (`spring.threads.virtual.enabled: true`)
+
+## Estrutura de pacotes
+- `application/controller` → `@RestController`, retorna `ResponseEntity<T>` ou tipo direto
+- `application/service` → `@Service`, toda lógica de negócio, injeção por construtor
+- `application/dto` → Records imutáveis ou classes com `@Data` para I/O HTTP/JPA
+- `application/repository` → `JpaRepository<Entidade, Long>` (ID sempre `Long`)
+- `application/exception` → herdar de `ApplicationException(message, code)`
+- `domain/model` → Entidades JPA e enums
+- `financialassistant/**` → módulo isolado do assistente financeiro
+
+## Regras obrigatórias
+- IDs de entidades: sempre `Long` com `@GeneratedValue(strategy = GenerationType.IDENTITY)`
+- Repositórios: `JpaRepository<Entidade, Long>` — nunca `String` como tipo de ID
+- Comparação de String: sempre `.equals()`, jamais `==`
+- Exceções: capturar em `GlobalExceptionHandler` (`@RestControllerAdvice`) — nunca expor stack trace
+- Logging: usar SLF4J via `@Slf4j` do Lombok; `log.info/warn/error` com contexto
+- `e.printStackTrace()` é proibido — use `log.error("mensagem", e)`
+- Serviços stateless: nunca guardar estado mutável em campos de instância de `@Service`
+- Usar `RestClient` (não `RestTemplate`) para chamadas HTTP externas
+
+## Nomenclatura
+- Classes: `PascalCase`
+- Métodos/variáveis: `camelCase`
+- Constantes: `UPPER_SNAKE_CASE`
+- Endpoints REST: `kebab-case` nos paths
+
+## Segurança
+- Chave de criptografia via `${FINANCIAL_ASSISTANT_ENCRYPTION_KEY}` — nunca hardcoded
+- `ddl-auto: update` apenas em dev; em prod usar `validate` ou migrations Flyway/Liquibase
