@@ -54,17 +54,23 @@ Infrastructure: Toda a comunicação e configuração externa do nosso sistema. 
 - [Maven] - para gestao de dependencias
 - [Postgre] - Banco de dados para salvar payloads
 
-### Rodando a aplicação no Docker Compose
+### Subindo o banco de dados com Docker Compose
+
+O `docker-compose.yaml` sobe o PostgreSQL e o pgAdmin usados pela aplicação:
 
 ```
 docker compose up -d
 ```
 
 ### Rodando a aplicação
+
+O projeto inclui o Maven Wrapper, então não é preciso ter o Maven instalado (apenas o JDK 25 ou superior):
+
 ```
-$ java -jar target/<app-name>-1.0-SNAPSHOT.jar
+$ ./mvnw clean package
+$ java -jar target/read_opendata_apis-0.0.1-SNAPSHOT.jar
 
 ou
 
-$ mvn spring-boot:run 
+$ ./mvnw spring-boot:run
 ```
